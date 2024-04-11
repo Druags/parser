@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+selenium = "*"
+beautifulsoup4 = "*"
+pydrive = "*"
+pandas = "*"
+tqdm = "*"
+sqlalchemy = "*"
+ipython = "*"
+pytest = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
