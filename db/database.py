@@ -1,16 +1,4 @@
-from sqlalchemy import create_engine, Table, URL
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-
-from db.config import settings
-
-mysql_engine = create_engine(
-    url=settings.DATABASE_URL_mysql,
-    # echo=True,
-    # pool_size=5,
-    # max_overflow=10
-)
-
-session_factory = sessionmaker(mysql_engine)
+from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
