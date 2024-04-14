@@ -8,7 +8,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 # TODO унифицировтаь под похожие случаи
 def get_authors() -> pd.DataFrame:
-    data = pd.read_csv('../data/manga_data_expanded.csv')
+    data = pd.read_csv('../../data/manga_data_expanded.csv')
     result = []
     for row in data[['url', 'authors']].itertuples():
         for author in row.authors.split('\n'):
@@ -29,13 +29,13 @@ def change_sex(sex: str) -> int:
 
 def get_titles_url() -> pd.DataFrame:
     unique_titles = set()
-    file_names = ['../data/favorite_titles.csv', '../data/abandoned_titles.csv']
+    file_names = ['../../data/favorite_titles.csv', '../../data/abandoned_titles.csv']
     for file_name in file_names:
         with open(file_name) as file:
             csv_reader = csv.reader(file)
             for line in csv_reader:
                 unique_titles.add(line[1].split('/')[-1])
-    titles_df = pd.read_csv('../data/manga_data_expanded.csv')
+    titles_df = pd.read_csv('../../data/manga_data_expanded.csv')
     titles_urls = list(titles_df['url'])
     unique_titles.update(titles_urls)
     unique_titles = pd.DataFrame(unique_titles, columns=['url'])
@@ -58,7 +58,7 @@ def get_pairs(file_name: str) -> pd.DataFrame:
 
 def get_user_data() -> pd.DataFrame:
     columns = ['url', 'sex', 'favorite_genres']
-    data = pd.read_csv('../data/users_info.csv',
+    data = pd.read_csv('../../data/users_info.csv',
                        header=None,
                        names=columns,
                        dtype='str').drop_duplicates(subset=['url'])
@@ -105,15 +105,15 @@ def get_unique_values() -> None:
 
 
 def expand_manga_data() -> None:
-    data = pd.read_csv('../data/manga_data.csv')
+    data = pd.read_csv('../../data/manga_data.csv')
     cols = ["Год релиза", "Статус тайтла", 'Статус перевода',
-            'Автор', 'Художник', "Издательство", 'Загружено глав', "Возрастной рейтинг"]
+            'Автор', 'Художник', "Издательство", 'Загружено глав', "Возрастной рейтинг", "Формат выпуска"]
     info_list = data['info_list']
     for col in cols:
         data[col] = get_field_values(info_list, col)
     data['link'] = data['link'].apply(get_url_last_part)
     data = data.rename(columns={'Тип': 'type',
-                                'Год релиза': 'year',
+                                'Год релиза': 'release_year',
                                 'Статус тайтла': 'publication_status',
                                 'Статус перевода': 'translation_status',
                                 'Автор': 'authors',
@@ -121,15 +121,17 @@ def expand_manga_data() -> None:
                                 'Издательство': 'publishers',
                                 'Загружено глав': 'chapters_uploaded',
                                 'Возрастной рейтинг': 'age_rating',
-                                'link': 'url'})
+                                'link': 'url',
+                                'Формат выпуска': 'release_format'})
     data['name'] = set_name(data['name'], data['alt_name'])
     data.drop(columns=['alt_name', 'info_list'], inplace=True)
-    na_cols = ['publication_status', 'translation_status',
-               'authors', 'artists', 'publishers', 'chapters_uploaded', 'age_rating', 'year']
-    for na_col in na_cols:
-        data[na_col].fillna('Unknown', inplace=True)
+    # na_cols = ['publication_status', 'translation_status',
+    #            'authors', 'artists', 'publishers', 'chapters_uploaded', 'age_rating', 'year']
+    # for na_col in na_cols:
+    #     data[na_col] = data[na_col].fillna('Unknown')
 
-    data.to_csv('../data/manga_data_expanded.csv', encoding='UTF-8', index=False)
+    data.to_csv('../../data/manga_data_expanded.csv', encoding='UTF-8', index=False)
+
 
 
 def get_abandoned_titles() -> pd.DataFrame:
@@ -156,3 +158,4 @@ def save_csv(data: dict) -> None:
     df = pd.DataFrame.from_records(data,
                                    columns=['user_id', 'user_link', 'title_id', 'title_link'])
     df.to_csv(file_name, index=False)
+
