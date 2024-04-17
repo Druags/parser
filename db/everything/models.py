@@ -1,7 +1,9 @@
-from .database import Base
 from sqlalchemy import String, ForeignKey, SmallInteger
 from typing import Annotated
 from sqlalchemy.orm import mapped_column, Mapped, relationship
+
+from .database import Base
+
 
 int_pk = Annotated[int, mapped_column(primary_key=True)]
 
@@ -42,7 +44,11 @@ class TitleORM(Base):
     age_rating: Mapped[int] = mapped_column(ForeignKey('age_rating.id'), nullable=True)
     translation_status: Mapped[int] = mapped_column(ForeignKey('translation_status.id'), nullable=True)
     publication_status: Mapped[int] = mapped_column(ForeignKey('publication_status.id'), nullable=True)
-    release_format: Mapped[int] = mapped_column(ForeignKey('release_format.id'), nullable=True)
+
+    release_formats: Mapped[list['ReleaseFormatORM']] = relationship(
+        back_populates='titles',
+        secondary='title_release_format'
+    )
 
     publishers: Mapped[list['PublisherORM']] = relationship(
         back_populates='titles',
@@ -102,7 +108,21 @@ class ReleaseFormatORM(Base):
 
     id: Mapped[int_pk]
     name: Mapped[str] = mapped_column(String(15))
-    titles: Mapped[list['TitleORM']] = relationship()
+    titles: Mapped[list['TitleORM']] = relationship(
+        back_populates='release_formats',
+        secondary='title_release_format'
+    )
+
+
+class TitleReleaseFormatORM(Base):
+    __tablename__ = 'title_release_format'
+
+    title_id: Mapped[int] = mapped_column(
+        ForeignKey('title.id', ondelete='CASCADE'),
+        primary_key=True)
+    release_format_id: Mapped[int] = mapped_column(
+        ForeignKey('release_format.id', ondelete='CASCADE'),
+        primary_key=True)
 
 
 class TranslationStatusORM(Base):
