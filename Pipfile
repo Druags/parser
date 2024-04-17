@@ -12,6 +12,7 @@ tqdm = "*"
 sqlalchemy = "*"
 ipython = "*"
 pytest = "*"
+parameterized = "*"
 
 [dev-packages]
 
