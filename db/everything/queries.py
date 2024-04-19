@@ -68,6 +68,19 @@ def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> N
         session.commit()
 
 
+def add_m2m_to_existing(session: Session, *,
+                   main_orm_name: Type[Base],
+                   b_p_field: str,
+                   add_orm_name: Type[Base],
+                   data: pd.DataFrame):
+    main_objects = session.query(main_orm_name).all()
+    for main_object in main_objects:
+        add_m2m(session,
+                main_object=main_object,
+                right_orm_name=add_orm_name,
+                b_p_field=b_p_field,
+                data=data.loc[main_object.url]['tags'])
+
 
 def add_m2m(session: Session, *,
             main_object,
