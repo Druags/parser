@@ -1,17 +1,16 @@
 import numpy
 import pandas as pd
 from typing import Type
-
 from sqlalchemy.sql.expression import func
 from sqlalchemy.orm.session import sessionmaker, Session
 from tqdm import tqdm
 
-from .data_work import get_user_data, get_pairs, get_titles_url, get_authors, expand_manga_data
-from .models import (UserORM, TitleORM, TagORM, FavoriteTitleORM,
-                     AbandonedTitleORM, AuthorORM, ArtistORM, PublisherORM,
-                     PublisherTitleORM, AuthorTitleORM, TranslationStatusORM, ReleaseFormatORM, PublicationStatusORM,
-                     AgeRatingORM, TypeORM)
-from .database import Base
+from db.everything.data_work import get_user_data, get_pairs, get_titles_url, get_authors, expand_manga_data
+from db.everything.models import (Base, UserORM, TitleORM, TagORM, FavoriteTitleORM,
+                                  AbandonedTitleORM, AuthorORM, ArtistORM, PublisherORM,
+                                  PublisherTitleORM, AuthorTitleORM, TranslationStatusORM, ReleaseFormatORM,
+                                  PublicationStatusORM, AgeRatingORM, TypeORM)
+
 from config import DATA_DIR
 
 
@@ -57,50 +56,26 @@ def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> N
                              )
             session.add(title)
 
-            # TODO крашится на [SQL: INSERT INTO artist_title (title_id, artist_id) VALUES (%s, %s)]
-            #  [parameters: (11229, 7925)]
-            # Pandas(Index=11229, type='Манхва', name='Клинок Призрачного мастера', url='shin-am-heng-eo-sa',
-            #        tags="['драма', 'история', 'приключения', 'сэйнэн', 'фэнтези', 'этти', 'Призраки / Духи', 'ГГ мужчина', 'Волшебники / маги']",
-            #        stats="{'Читаю': 416, 'В планах': 643, 'Брошено': 90, 'Прочитано': 123, 'Любимое': 18, 'Другое': 308}",
-            #        ratings='{10: 28, 9: 1, 8: 4, 7: 1, 6: 5, 5: 1, 4: 2}', release_year='2017',
-            #        publication_status='Завершён', translation_status='Заброшен', authors={'Yun In Wan'},
-            #        artists={'YANG Kyung-Il'}, publishers={'Naver', 'YLab'}, chapters_uploaded='7', age_rating='16+',
-            #        release_formats={'Веб', 'В цвете'})
+            m2m_relations = ((AuthorORM, 'authors', getattr(row, 'authors')),
+                             (PublisherORM, 'publishers', getattr(row, 'publishers')),
+                             (ArtistORM, 'artists', getattr(row, 'artists')),
+                             (ReleaseFormatORM, 'release_formats', getattr(row, 'release_formats'))
+                             )
+            for orn_name, b_p_field, data in m2m_relations:
+                add_m2m(session, main_object=title, right_orm_name=orn_name, b_p_field=b_p_field, data=data)
 
-            authors = getattr(row, 'authors')
-            publishers = getattr(row, 'publishers')
-            artists = getattr(row, 'artists')
-            release_formats = getattr(row, 'release_formats')
-
-            for release_format in release_formats:
-                release_format = session.query(ReleaseFormatORM).filter_by(id=get_id(session, ReleaseFormatORM,
-                                                                                     release_format)).first()
-                title.release_formats.append(release_format)
-
-            for author in authors:
-                author = session.query(AuthorORM).filter_by(id=get_id(session, AuthorORM, author)).first()
-                title.authors.append(author)
-            for publisher in publishers:
-                publisher = session.query(PublisherORM).filter_by(
-                    id=get_id(session, PublisherORM, publisher)).first()
-                title.publishers.append(publisher)
-            for artist in artists:
-                artist = session.query(ArtistORM).filter_by(id=get_id(session, ArtistORM, artist)).first()
-
-                title.artists.append(artist)
-
-            # TODO добавить к созданной записи её связи с другими таблицами
         session.flush()
         session.commit()
 
 
+
 def add_m2m(session: Session, *,
-            left_orm_object: Type[Base] = None,
+            main_object,
             right_orm_name: Type[Base],
-            attr: str,
+            b_p_field: str,
             data: set) -> None:
     for element in data:
-        (getattr(left_orm_object, attr).
+        (getattr(main_object, b_p_field).
          append(session.query(right_orm_name).
                 filter_by(id=get_id(session, right_orm_name, element)
                           ).first()
