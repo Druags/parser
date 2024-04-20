@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
-                                  TagORM, AbandonedTitleORM, TitleTagORM)
+                                  TagORM, AbandonedTitleORM, TitleTagORM, PublisherTitleORM, FavoriteTitleORM)
 from db.everything.queries import (fill_table, add_categories, add_id_to_id_conn,
                                    get_id, add_full_title, add_m2m, add_m2m_to_existing)
 from db.test.data import *
@@ -66,7 +66,7 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_get_id(self):
         with self.session_factory() as session:
-            result = get_id(session, AuthorORM, 'name')
+            result = get_id(session, AuthorORM, {'name':'name'})
             self.assertEqual(1, result)
 
     def test_negative_get_id(self):
@@ -113,7 +113,7 @@ class TestQueries(unittest.TestCase):
                     )
 
             expected = '[<TitleTagORM title_id=1, tag_id=1>, <TitleTagORM title_id=1, tag_id=2>]'
-            self.assertEqual(expected, str(session.query(TitleTagORM).all()))
+            self.assertEqual(expected, str(session.query(TitleTagORM).filter_by(title_id=1).all()))
 
     def test_positive_update_object(self):
         add_full_title(self.session_factory, good_title_full_data)
@@ -124,7 +124,25 @@ class TestQueries(unittest.TestCase):
                            add_orm_name=TagORM,
                            data=good_title_full_data[['url', 'tags']].set_index(good_title_full_data['url']))
             expected = '[<TitleTagORM title_id=1, tag_id=1>, <TitleTagORM title_id=1, tag_id=2>]'
-            self.assertEqual(expected, str(session.query(TitleTagORM).all()))
+            print(session.query(PublisherTitleORM).filter_by(title_id=2).all())
+            self.assertEqual(expected, str(session.query(TitleTagORM).filter_by(title_id=1).all()))
+
+    def test_positive_add_favorite_titles(self):
+        fill_table(self.session_factory, orm_name=UserORM, data=good_user_full_data[['id', 'sex']])
+        with self.session_factory() as session:
+            user = session.query(UserORM).first()
+            add_m2m(session,
+                    main_object=user,
+                    right_orm_name=TitleORM,
+                    b_p_field='favorite_titles',
+                    data=good_user_full_data.iloc[0]['favorite_titles'],
+                    field_name='url')
+            session.flush()
+            session.commit()
+        expected = '[<FavoriteTitleORM title_id=1, user_id=1>, <FavoriteTitleORM title_id=2, user_id=1>]'
+        real = str(session.query(FavoriteTitleORM).all())
+        self.assertEqual(expected, real)
+
 
 
 
