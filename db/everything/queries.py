@@ -1,6 +1,9 @@
 import numpy
 import pandas as pd
 from typing import Type
+
+from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.orm import load_only
 from sqlalchemy.sql.expression import func
 from sqlalchemy.orm.session import sessionmaker, Session
 from tqdm import tqdm
@@ -10,7 +13,6 @@ from db.everything.models import (Base, UserORM, TitleORM, TagORM, FavoriteTitle
                                   AbandonedTitleORM, AuthorORM, ArtistORM, PublisherORM,
                                   PublisherTitleORM, AuthorTitleORM, TranslationStatusORM, ReleaseFormatORM,
                                   PublicationStatusORM, AgeRatingORM, TypeORM)
-
 from config import DATA_DIR
 
 
@@ -45,14 +47,14 @@ def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> N
             title = TitleORM(url=getattr(row, 'url'),
                              release_year=getattr(row, 'release_year'),
                              chapters_uploaded=getattr(row, 'chapters_uploaded'),
-                             type=get_id(session, TypeORM, getattr(row, 'type')),
-                             age_rating=get_id(session, AgeRatingORM, getattr(row, 'age_rating')),
+                             type=get_id(session, TypeORM, {'name': getattr(row, 'type')}),
+                             age_rating=get_id(session, AgeRatingORM, {'name': getattr(row, 'age_rating')}),
                              translation_status=get_id(session,
                                                        TranslationStatusORM,
-                                                       getattr(row, 'translation_status')),
+                                                       {'name': getattr(row, 'translation_status')}),
                              publication_status=get_id(session,
                                                        PublicationStatusORM,
-                                                       getattr(row, 'publication_status'))
+                                                       {'name': getattr(row, 'publication_status')})
                              )
             session.add(title)
 
@@ -69,12 +71,21 @@ def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> N
 
 
 def add_m2m_to_existing(session: Session, *,
-                   main_orm_name: Type[Base],
-                   b_p_field: str,
-                   add_orm_name: Type[Base],
-                   data: pd.DataFrame):
-    main_objects = session.query(main_orm_name).all()
-    for main_object in main_objects:
+                        main_orm_name: Type[Base],
+                        b_p_field: str,
+                        add_orm_name: Type[Base],
+                        data: pd.DataFrame):
+    """
+    :param session:
+    :param main_orm_name: should have "url" field
+    :param b_p_field:
+    :param add_orm_name:
+    :param data:
+    :return:
+    """
+
+    main_objects = session.query(main_orm_name).options(load_only(main_orm_name.url)).all()
+    for main_object in tqdm(main_objects):
         add_m2m(session,
                 main_object=main_object,
                 right_orm_name=add_orm_name,
@@ -86,23 +97,33 @@ def add_m2m(session: Session, *,
             main_object,
             right_orm_name: Type[Base],
             b_p_field: str,
-            data: set) -> None:
+            data: set,
+            field_name: str = 'name') -> None:
+
     for element in data:
+
         (getattr(main_object, b_p_field).
          append(session.query(right_orm_name).
-                filter_by(id=get_id(session, right_orm_name, element)
-                          ).first()
+                filter_by(id=get_id(session,
+                                    right_orm_name,
+                                    {field_name: element})).first()
                 )
          )
 
 
-def get_id(session: Session, orm_name: Type[Base], name: str):
-    if pd.isnull(name):
+def get_id(session: Session, orm_name: Type[Base], n_a_v: dict):
+    '''
+    :param session:
+    :param orm_name:
+    :param n_a_v: takes dict {field_name: field_value}
+    :return:
+    '''
+    if pd.isnull(n_a_v):
         return
     try:
-        return session.query(orm_name).filter_by(name=name).first().id
+        return session.query(orm_name).filter_by(**n_a_v).first().id
     except AttributeError:
-        session.add(orm_name(name=name))
+        session.add(orm_name(**n_a_v))
         max_id = session.query(func.max(orm_name.id)).first()[0]
 
         return max_id
@@ -130,7 +151,7 @@ def add_category(session_factory: sessionmaker, *, orm_name: Type[Base], categor
         session.flush()
         session.commit()
 
-
+# TODO можно адаптировать данные под fill_table
 def add_connections(session_factory: sessionmaker) -> None:
     favorite_titles = get_pairs('E:/manga_parser/data/favorite_titles.csv')
     abandoned_titles = get_pairs('E:/manga_parser/data/abandoned_titles.csv')
@@ -152,7 +173,10 @@ def add_connections(session_factory: sessionmaker) -> None:
                           left_key=left_key)
 
 
-def fill_table(session_factory: sessionmaker, *, orm_name: Type[Base], data: pd.DataFrame) -> None:
+def fill_table(session_factory: sessionmaker,
+               *,
+               orm_name: Type[Base],
+               data: pd.DataFrame) -> None:
     with session_factory() as session:
         session.add_all([orm_name(**{col: getattr(row, col) for col in data.columns}) for row in data.itertuples()])
         session.flush()
@@ -160,8 +184,13 @@ def fill_table(session_factory: sessionmaker, *, orm_name: Type[Base], data: pd.
 
 
 # TODO придумать как сделать аналогичную запись в бд при парсинге без записи в цсв файл
-def add_id_to_id_conn(session_factory: sessionmaker, *, orm_name: Type[Base], right_table: pd.DataFrame, right_key: str,
-                      left_table: pd.DataFrame, left_key: str) -> None:
+def add_id_to_id_conn(session_factory: sessionmaker,
+                      *,
+                      orm_name: Type[Base],
+                      right_table: pd.DataFrame,
+                      right_key: str,
+                      left_table: pd.DataFrame,
+                      left_key: str) -> None:
     with session_factory() as session:
         u_id_x_t_id = left_table.merge(right=right_table,
                                        left_on=left_key,
@@ -174,9 +203,24 @@ def add_id_to_id_conn(session_factory: sessionmaker, *, orm_name: Type[Base], ri
         session.commit()
 
 
-def select_orm(session_factory: sessionmaker, *, orm_name: Type[Base], index_name: str) -> pd.DataFrame:
+def select_orm(session_factory: sessionmaker,
+               *,
+               orm_name: Type[Base],
+               index_name: str) -> pd.DataFrame:
     with session_factory() as session:
         result = session.query(orm_name).all()
         result = pd.DataFrame.from_records([ob.to_dict() for ob in result], index='id')
         result[index_name] = result.index
         return result
+
+
+def test_query(session_factory: sessionmaker):
+    titles = expand_manga_data()
+    with session_factory() as session:
+        add_m2m_to_existing(session,
+                            main_orm_name=TitleORM,
+                            b_p_field='tags',
+                            add_orm_name=TagORM,
+                            data=titles[['url', 'tags']].set_index(titles['url']))
+        session.flush()
+        session.commit()
