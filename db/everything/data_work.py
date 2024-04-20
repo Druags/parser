@@ -111,7 +111,13 @@ def remove_duplicates_from_list(data: pd.Series) -> list:
     result = []
     for value in data.values:
         if value:
-            result.append(set(map(lambda x: x.lower(), value.split('\n'))))
+            if '[' in value and ']' in value:
+                for sym in '[', ']', "'":
+                    value = value.replace(sym, '')
+                value = set(value.split(', '))
+                result.append(set(map(lambda x: x.lower(), value)))
+            else:
+                result.append(set(map(lambda x: x.lower(), value.split('\n'))))
         else:
             result.append(set())
     return result
@@ -126,7 +132,7 @@ def fix_year(year: str) -> str:
 
 def expand_manga_data(regime: str = 'return') -> Any:
     data = pd.read_csv(DATA_DIR + 'manga_data.csv')
-    data = data.drop_duplicates()
+
     cols = ["Год релиза", "Статус тайтла", 'Статус перевода',
             'Автор', 'Художник', "Издательство", 'Загружено глав', "Возрастной рейтинг", "Формат выпуска"]
     info_list = data['info_list']
@@ -144,13 +150,10 @@ def expand_manga_data(regime: str = 'return') -> Any:
                                 'Возрастной рейтинг': 'age_rating',
                                 'link': 'url',
                                 'Формат выпуска': 'release_formats'})
+    data = data.drop_duplicates(subset=['url'])
     data['name'] = set_name(data['name'], data['alt_name'])
     data.drop(columns=['alt_name', 'info_list'], inplace=True)
-    # na_cols = ['publication_status', 'translation_status',
-    #            'authors', 'artists', 'publishers', 'chapters_uploaded', 'age_rating', 'year']
-    # for na_col in na_cols:
-    #     data[na_col] = data[na_col].fillna('Unknown')
-    m2m_cols = ['publishers', 'authors', 'artists', 'release_formats']
+    m2m_cols = ['publishers', 'authors', 'artists', 'release_formats', 'tags']
     data = data.replace(np.nan, None)
     for m2m_col in m2m_cols:
         data[m2m_col] = remove_duplicates_from_list(data[m2m_col])
