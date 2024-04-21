@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, SmallInteger
+from sqlalchemy import String, ForeignKey, SmallInteger, Integer
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.orm import DeclarativeBase
 from typing import Annotated
@@ -24,6 +24,7 @@ class UserORM(Base):
     __tablename__ = 'user'
 
     id: Mapped[int_pk]
+    url: Mapped[int] = mapped_column(Integer)
     sex: Mapped[int] = mapped_column(SmallInteger)
 
     favorite_titles: Mapped[list['TitleORM']] = relationship(
@@ -48,7 +49,7 @@ class TitleORM(Base):
     __tablename__ = 'title'
 
     id: Mapped[int_pk]
-    url: Mapped[str] = mapped_column(String(300))
+    url: Mapped[str] = mapped_column(String(300), unique=True)
 
     release_year: Mapped[int] = mapped_column(SmallInteger, nullable=True)
     chapters_uploaded: Mapped[int] = mapped_column(SmallInteger, nullable=True)
@@ -96,7 +97,7 @@ class ArtistORM(Base):
     __tablename__ = 'artist'
 
     id: Mapped[int_pk]
-    name: Mapped[str] = mapped_column(String(70))
+    name: Mapped[str] = mapped_column(String(70), unique=True)
 
     titles: Mapped[list['TitleORM']] = relationship(
         back_populates='artists',
@@ -108,7 +109,7 @@ class PublisherORM(Base):
     __tablename__ = 'publisher'
 
     id: Mapped[int_pk]
-    name: Mapped[str] = mapped_column(String(60))
+    name: Mapped[str] = mapped_column(String(60), unique=True)
     titles: Mapped[list['TitleORM']] = relationship(
         back_populates='publishers',
         secondary='publisher_title'
@@ -173,7 +174,7 @@ class AuthorORM(Base):
     __tablename__ = 'author'
 
     id: Mapped[int_pk]
-    name: Mapped[str] = mapped_column(String(60))
+    name: Mapped[str] = mapped_column(String(60), unique=True)
 
     titles: Mapped[list['TitleORM']] = relationship(
         back_populates='authors',
