@@ -22,28 +22,50 @@ def create_tables(engine) -> None:
 
 
 def fill_tables(session_factory: sessionmaker) -> None:
-    user_data = get_user_data()
-
-    # titles = get_titles_url()
-    titles = expand_manga_data()
+    user_data = pd.read_csv(DATA_DIR + 'users_full_info.csv')
     authors = pd.read_csv(DATA_DIR + 'authors.csv', names=['name'])
     artists = pd.read_csv(DATA_DIR + 'artists.csv', names=['name'])
     publishers = pd.read_csv(DATA_DIR + 'publishers.csv', names=['name'])
     tags = pd.read_csv(DATA_DIR + 'tags.csv', names=['name'])
-    models_and_data = ((UserORM, user_data), (AuthorORM, authors), (ArtistORM, artists),
-                       (PublisherORM, publishers), (TagORM, tags))
-    # add_m2m(session_factory, right_orm_object=TagORM, attr='tags',
-    #         left_orm_object=TitleORM, data=titles.iloc[0]['tags'])
+    models_and_data = ((AuthorORM, authors),
+                       (ArtistORM, artists),
+                       (PublisherORM, publishers),
+                       (TagORM, tags))
     for orm_name, data in models_and_data:
-        fill_table(session_factory, orm_name=orm_name, data=data)
+        df_to_orm(session_factory, orm_name=orm_name, data=data)
     add_categories(session_factory)
-    fill_table(session_factory, orm_name=TitleORM, data=titles)
+
+    titles = expand_manga_data()
     add_full_title(session_factory, titles)
 
 
-def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> None:
+def add_full_user(session_factory: sessionmaker, data: pd.DataFrame) -> None:
     with session_factory() as session:
-        for row in tqdm(title_data.itertuples()):
+        for row in tqdm(data.itertuples()):
+            user = UserORM(url=getattr(row, 'url'),
+                           sex=getattr(row, 'sex'))
+            session.add(user)
+
+            m2m_relations = (
+                (TitleORM, 'favorite_titles', getattr(row, 'favorite_titles')),
+                (TitleORM, 'abandoned_titles', getattr(row, 'abandoned_titles'))
+            )
+
+            for orn_name, b_p_field, data in m2m_relations:
+                add_m2m(session,
+                        main_object=user,
+                        right_orm_name=orn_name,
+                        b_p_field=b_p_field,
+                        data=data,
+                        field_name='url')
+
+        session.flush()
+        session.commit()
+
+
+def add_full_title(session_factory: sessionmaker, data: pd.DataFrame) -> None:
+    with session_factory() as session:
+        for row in tqdm(data.itertuples()):
             title = TitleORM(url=getattr(row, 'url'),
                              release_year=getattr(row, 'release_year'),
                              chapters_uploaded=getattr(row, 'chapters_uploaded'),
@@ -57,12 +79,13 @@ def add_full_title(session_factory: sessionmaker, title_data: pd.DataFrame) -> N
                                                        {'name': getattr(row, 'publication_status')})
                              )
             session.add(title)
-
-            m2m_relations = ((AuthorORM, 'authors', getattr(row, 'authors')),
-                             (PublisherORM, 'publishers', getattr(row, 'publishers')),
-                             (ArtistORM, 'artists', getattr(row, 'artists')),
-                             (ReleaseFormatORM, 'release_formats', getattr(row, 'release_formats'))
-                             )
+            m2m_relations = (
+                (AuthorORM, 'authors', getattr(row, 'authors')),
+                (PublisherORM, 'publishers', getattr(row, 'publishers')),
+                (ArtistORM, 'artists', getattr(row, 'artists')),
+                (ReleaseFormatORM, 'release_formats', getattr(row, 'release_formats')),
+                (TagORM, 'tags', getattr(row, 'tags'))
+            )
             for orn_name, b_p_field, data in m2m_relations:
                 add_m2m(session, main_object=title, right_orm_name=orn_name, b_p_field=b_p_field, data=data)
 
@@ -75,22 +98,19 @@ def add_m2m_to_existing(session: Session, *,
                         b_p_field: str,
                         add_orm_name: Type[Base],
                         data: pd.DataFrame):
-    """
-    :param session:
-    :param main_orm_name: should have "url" field
-    :param b_p_field:
-    :param add_orm_name:
-    :param data:
-    :return:
-    """
-
-    main_objects = session.query(main_orm_name).options(load_only(main_orm_name.url)).all()
+    main_objects = session.query(main_orm_name).all()
     for main_object in tqdm(main_objects):
+        try:
+            data_part = data.loc[main_object.url][b_p_field]
+        except KeyError:
+            continue
         add_m2m(session,
                 main_object=main_object,
                 right_orm_name=add_orm_name,
                 b_p_field=b_p_field,
-                data=data.loc[main_object.url]['tags'])
+                data=data_part)
+    session.flush()
+    session.commit()
 
 
 def add_m2m(session: Session, *,
@@ -99,9 +119,7 @@ def add_m2m(session: Session, *,
             b_p_field: str,
             data: set,
             field_name: str = 'name') -> None:
-
     for element in data:
-
         (getattr(main_object, b_p_field).
          append(session.query(right_orm_name).
                 filter_by(id=get_id(session,
@@ -112,12 +130,12 @@ def add_m2m(session: Session, *,
 
 
 def get_id(session: Session, orm_name: Type[Base], n_a_v: dict):
-    '''
+    """
     :param session:
     :param orm_name:
     :param n_a_v: takes dict {field_name: field_value}
     :return:
-    '''
+    """
     if pd.isnull(n_a_v):
         return
     try:
@@ -151,6 +169,7 @@ def add_category(session_factory: sessionmaker, *, orm_name: Type[Base], categor
         session.flush()
         session.commit()
 
+
 # TODO можно адаптировать данные под fill_table
 def add_connections(session_factory: sessionmaker) -> None:
     favorite_titles = get_pairs('E:/manga_parser/data/favorite_titles.csv')
@@ -173,10 +192,10 @@ def add_connections(session_factory: sessionmaker) -> None:
                           left_key=left_key)
 
 
-def fill_table(session_factory: sessionmaker,
-               *,
-               orm_name: Type[Base],
-               data: pd.DataFrame) -> None:
+def df_to_orm(session_factory: sessionmaker,
+              *,
+              orm_name: Type[Base],
+              data: pd.DataFrame) -> None:
     with session_factory() as session:
         session.add_all([orm_name(**{col: getattr(row, col) for col in data.columns}) for row in data.itertuples()])
         session.flush()
@@ -215,12 +234,17 @@ def select_orm(session_factory: sessionmaker,
 
 
 def test_query(session_factory: sessionmaker):
-    titles = expand_manga_data()
+    data = pd.read_csv(DATA_DIR + 'users_full_info.csv')
     with session_factory() as session:
         add_m2m_to_existing(session,
-                            main_orm_name=TitleORM,
-                            b_p_field='tags',
-                            add_orm_name=TagORM,
-                            data=titles[['url', 'tags']].set_index(titles['url']))
+                            main_orm_name=UserORM,
+                            b_p_field='favorite_titles',
+                            add_orm_name=TitleORM,
+                            data=data[['id', 'favorite_titles']].set_index(data['id']))
+        add_m2m_to_existing(session,
+                            main_orm_name=UserORM,
+                            b_p_field='abandoned_titles',
+                            add_orm_name=TitleORM,
+                            data=data[['id', 'abandoned_titles']].set_index(data['id']))
         session.flush()
         session.commit()
