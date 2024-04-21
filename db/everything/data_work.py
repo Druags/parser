@@ -31,7 +31,8 @@ def change_sex(sex: str) -> int:
 
 def get_titles_url() -> pd.DataFrame:
     unique_titles = set()
-    file_names = [DATA_DIR + 'favorite_titles.csv', DATA_DIR + 'abandoned_titles.csv']
+    file_names = [DATA_DIR + 'favorite_titles.csv',
+                  DATA_DIR + 'abandoned_titles.csv']
     for file_name in file_names:
         with open(file_name) as file:
             csv_reader = csv.reader(file)
@@ -181,6 +182,37 @@ def get_favorite_titles() -> pd.DataFrame:
                        dtype='str')
     return data
 
+
+def merge_user_and_titles() -> None:
+    user_info_data = pd.read_csv(DATA_DIR + 'users_info.csv', names=['url', 'sex', 'favorite_genres'])
+    fav_title_data = pd.read_csv(DATA_DIR + 'favorite_titles.csv', names=['user_url', 'title_url'])
+    ab_title_data = pd.read_csv(DATA_DIR + 'abandoned_titles.csv', names=['user_url', 'title_url'])
+
+    fav_title_data['title_url'] = fav_title_data['title_url'].apply(get_url_last_part)
+    ab_title_data['title_url'] = ab_title_data['title_url'].apply(get_url_last_part)
+
+    fav_titles = dict()
+    for row in fav_title_data.itertuples():
+        fav_titles.setdefault(row.user_url, []).append(row.title_url)
+    fav_titles = pd.Series(fav_titles, name='title_url')
+
+    ab_titles = dict()
+    for row in ab_title_data.itertuples():
+        ab_titles.setdefault(row.user_url, []).append(row.title_url)
+    ab_titles = pd.Series(ab_titles, name='title_url')
+
+    user_info_data = pd.merge(user_info_data, fav_titles, left_on='url', right_index=True)
+    user_info_data = pd.merge(user_info_data, ab_titles, left_on='url', right_index=True)
+
+    user_info_data.rename(columns={'title_url_x': 'favorite_titles',
+                                   'title_url_y': 'abandoned_titles'},
+                          inplace=True)
+    user_info_data['url'] = user_info_data['url'].apply(get_url_last_part)
+    user_info_data['sex'] = user_info_data['sex'].apply(change_sex)
+    user_info_data.to_csv(DATA_DIR + 'users_full_info.csv',
+                          index=False)
+
+merge_user_and_titles()
 
 def save_csv(data: dict) -> None:
     file_name = DATA_DIR + 'users_and_titles.csv'
