@@ -122,10 +122,10 @@ class TestQueries(unittest.TestCase):
             user = session.query(UserORM).first()
             add_m2m(session,
                     main_object=user,
-                    right_orm_name=TitleORM,
+                    join_orm=TitleORM,
                     b_p_field='favorite_titles',
-                    data=good_user_full_data.iloc[0]['favorite_titles'],
-                    field_name='url')
+                    join_records=good_user_full_data.iloc[0]['favorite_titles'],
+                    key_field_name='url')
             session.flush()
             session.commit()
         expected = '[<FavoriteTitleORM title_id=1, user_id=1>, <FavoriteTitleORM title_id=2, user_id=1>]'

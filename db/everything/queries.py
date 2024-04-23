@@ -57,10 +57,10 @@ def add_full_user(session_factory: sessionmaker, data: pd.DataFrame) -> None:
             for orn_name, b_p_field, join_records in m2m_relations:
                 add_m2m(session,
                         main_object=user,
-                        right_orm_name=orn_name,
+                        join_orm=orn_name,
                         b_p_field=b_p_field,
                         join_records=join_records,
-                        field_name='url')
+                        key_field_name='url')
 
         session.flush()
         session.commit()
@@ -90,7 +90,7 @@ def add_full_title(session_factory: sessionmaker, data: pd.DataFrame) -> None:
                 (TagORM, 'tags', getattr(row, 'tags'))
             )
             for orn_name, b_p_field, data in m2m_relations:
-                add_m2m(session, main_object=title, right_orm_name=orn_name, b_p_field=b_p_field, join_records=data)
+                add_m2m(session, main_object=title, join_orm=orn_name, b_p_field=b_p_field, join_records=data)
 
         session.flush()
         session.commit()
@@ -109,7 +109,7 @@ def add_m2m_to_existing(session: Session, *,
             continue
         add_m2m(session,
                 main_object=main_object,
-                right_orm_name=add_orm_name,
+                join_orm=add_orm_name,
                 b_p_field=b_p_field,
                 join_records=data_part)
     session.flush()
