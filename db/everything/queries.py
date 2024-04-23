@@ -1,7 +1,8 @@
+from collections import namedtuple
+
 import numpy
 import pandas as pd
 from typing import Type
-
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm import load_only
 from sqlalchemy.sql.expression import func
@@ -23,16 +24,15 @@ def create_tables(engine) -> None:
 
 def fill_tables(session_factory: sessionmaker) -> None:
     user_data = pd.read_csv(DATA_DIR + 'users_full_info.csv')
-    authors = pd.read_csv(DATA_DIR + 'authors.csv', names=['name'])
-    artists = pd.read_csv(DATA_DIR + 'artists.csv', names=['name'])
-    publishers = pd.read_csv(DATA_DIR + 'publishers.csv', names=['name'])
-    tags = pd.read_csv(DATA_DIR + 'tags.csv', names=['name'])
-    models_and_data = ((AuthorORM, authors),
-                       (ArtistORM, artists),
-                       (PublisherORM, publishers),
-                       (TagORM, tags))
-    for orm_name, data in models_and_data:
-        df_to_orm(session_factory, orm_name=orm_name, data=data)
+
+    TableContent = namedtuple('TableContent', ['orm_name', 'table_content'])
+    tables_content = (TableContent(AuthorORM, pd.read_csv(DATA_DIR + 'authors.csv', names=['name'])),
+                      TableContent(ArtistORM, pd.read_csv(DATA_DIR + 'artists.csv', names=['name'])),
+                      TableContent(PublisherORM, pd.read_csv(DATA_DIR + 'publishers.csv', names=['name'])),
+                      TableContent(TagORM, pd.read_csv(DATA_DIR + 'tags.csv', names=['name'])))
+
+    for orm_name, table_content in tables_content:
+        df_to_orm(session_factory, orm_name=orm_name, data=table_content)
     add_categories(session_factory)
 
     titles = expand_manga_data()
@@ -40,6 +40,9 @@ def fill_tables(session_factory: sessionmaker) -> None:
 
 
 def add_full_user(session_factory: sessionmaker, data: pd.DataFrame) -> None:
+    TableRelation = namedtuple('TableRelation',
+                               ['orm_name', 'bp_field_name', 'join_records'])
+
     with session_factory() as session:
         for row in tqdm(data.itertuples()):
             user = UserORM(url=getattr(row, 'url'),
@@ -47,16 +50,16 @@ def add_full_user(session_factory: sessionmaker, data: pd.DataFrame) -> None:
             session.add(user)
 
             m2m_relations = (
-                (TitleORM, 'favorite_titles', getattr(row, 'favorite_titles')),
-                (TitleORM, 'abandoned_titles', getattr(row, 'abandoned_titles'))
+                TableRelation(TitleORM, 'favorite_titles', getattr(row, 'favorite_titles')),
+                TableRelation(TitleORM, 'abandoned_titles', getattr(row, 'abandoned_titles'))
             )
 
-            for orn_name, b_p_field, data in m2m_relations:
+            for orn_name, b_p_field, join_records in m2m_relations:
                 add_m2m(session,
                         main_object=user,
                         right_orm_name=orn_name,
                         b_p_field=b_p_field,
-                        data=data,
+                        join_records=join_records,
                         field_name='url')
 
         session.flush()
@@ -87,7 +90,7 @@ def add_full_title(session_factory: sessionmaker, data: pd.DataFrame) -> None:
                 (TagORM, 'tags', getattr(row, 'tags'))
             )
             for orn_name, b_p_field, data in m2m_relations:
-                add_m2m(session, main_object=title, right_orm_name=orn_name, b_p_field=b_p_field, data=data)
+                add_m2m(session, main_object=title, right_orm_name=orn_name, b_p_field=b_p_field, join_records=data)
 
         session.flush()
         session.commit()
@@ -108,23 +111,23 @@ def add_m2m_to_existing(session: Session, *,
                 main_object=main_object,
                 right_orm_name=add_orm_name,
                 b_p_field=b_p_field,
-                data=data_part)
+                join_records=data_part)
     session.flush()
     session.commit()
 
 
 def add_m2m(session: Session, *,
             main_object,
-            right_orm_name: Type[Base],
             b_p_field: str,
-            data: set,
-            field_name: str = 'name') -> None:
-    for element in data:
+            join_orm: Type[Base],
+            join_records: set,
+            key_field_name: str = 'name') -> None:
+    for record_key in join_records:
         (getattr(main_object, b_p_field).
-         append(session.query(right_orm_name).
+         append(session.query(join_orm).
                 filter_by(id=get_id(session,
-                                    right_orm_name,
-                                    {field_name: element})).first()
+                                    join_orm,
+                                    {key_field_name: record_key})).first()
                 )
          )
 
@@ -148,16 +151,17 @@ def get_id(session: Session, orm_name: Type[Base], n_a_v: dict):
 
 
 def add_categories(session_factory: sessionmaker) -> None:
-    types = ['Манхва', 'Манга', 'Маньхуа', 'Комикс западный', 'OEL-манга', 'Руманга']
-    publication_statuses = ['Завершён', 'Онгоинг', 'Выпуск прекращён', 'Приостановлен', 'Анонс']
-    age_ratings = ['16+', '18+']
-    translation_statuses = ['Завершен', 'Заброшен', 'Продолжается', 'Заморожен']
-    release_formats = ['4-кома (Ёнкома)', 'В цвете', 'Веб', 'Вебтун', 'Додзинси', 'Сборник', 'Сингл']
-    categories_data = [(TypeORM, types),
-                       (PublicationStatusORM, publication_statuses),
-                       (AgeRatingORM, age_ratings),
-                       (TranslationStatusORM, translation_statuses),
-                       (ReleaseFormatORM, release_formats)
+    CategoryContent = namedtuple('CategoryContent', ['orm_name', 'content'])
+    categories_data = [CategoryContent(TypeORM,
+                                       ['Манхва', 'Манга', 'Маньхуа', 'Комикс западный', 'OEL-манга', 'Руманга']),
+                       CategoryContent(PublicationStatusORM,
+                                       ['Завершён', 'Онгоинг', 'Выпуск прекращён', 'Приостановлен', 'Анонс']),
+                       CategoryContent(AgeRatingORM,
+                                       ['16+', '18+']),
+                       CategoryContent(TranslationStatusORM,
+                                       ['Завершен', 'Заброшен', 'Продолжается', 'Заморожен']),
+                       CategoryContent(ReleaseFormatORM,
+                                       ['4-кома (Ёнкома)', 'В цвете', 'Веб', 'Вебтун', 'Додзинси', 'Сборник', 'Сингл'])
                        ]
     for orm_name, categories in categories_data:
         add_category(session_factory, orm_name=orm_name, categories=categories)
