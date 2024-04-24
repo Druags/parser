@@ -1,23 +1,8 @@
-import csv
-
 from typing import Any
 import numpy as np
 import pandas as pd
 
 from config import DATA_DIR
-
-
-# TODO унифицировтаь под похожие случаи
-def get_authors() -> pd.DataFrame:
-    data = pd.read_csv(DATA_DIR + 'manga_data_expanded.csv')
-    result = []
-    for row in data[['url', 'authors']].itertuples():
-        if not pd.isnull(row.authors):
-            for author in row.authors.split('\n'):
-                result.append((row.url, author))
-    result = pd.DataFrame(result, columns=['title_url', 'author_name'])
-
-    return result
 
 
 def change_sex(sex: str) -> int:
@@ -29,47 +14,8 @@ def change_sex(sex: str) -> int:
         return 2
 
 
-def get_titles_url() -> pd.DataFrame:
-    unique_titles = set()
-    file_names = [DATA_DIR + 'favorite_titles.csv',
-                  DATA_DIR + 'abandoned_titles.csv']
-    for file_name in file_names:
-        with open(file_name) as file:
-            csv_reader = csv.reader(file)
-            for line in csv_reader:
-                unique_titles.add(line[1].split('/')[-1])
-    titles_df = pd.read_csv(DATA_DIR + 'manga_data_expanded.csv')
-    titles_urls = list(titles_df['url'])
-    unique_titles.update(titles_urls)
-    unique_titles = pd.DataFrame(unique_titles, columns=['url'])
-
-    return unique_titles
-
-
 def get_url_last_part(url) -> str:
     return url.split('/')[-1]
-
-
-def get_pairs(file_name: str) -> pd.DataFrame:
-    df = pd.read_csv(file_name, header=None,
-                     names=['user_id', 'title_url'],
-                     dtype='str').drop_duplicates()
-    df['user_id'] = df['user_id'].apply(get_url_last_part).astype(int)
-    df['title_url'] = df['title_url'].apply(get_url_last_part)
-    return df
-
-
-def get_user_data() -> pd.DataFrame:
-    columns = ['url', 'sex', 'favorite_genres']
-    data = pd.read_csv(DATA_DIR + 'users_info.csv',
-                       header=None,
-                       names=columns,
-                       dtype='str').drop_duplicates(subset=['url'])
-    data['sex'] = data['sex'].apply(change_sex)
-    data['url'] = data['url'].apply(get_url_last_part)
-    data.rename(columns={'url': 'id'}, inplace=True)
-
-    return data[['id', 'sex']]
 
 
 def get_field_values(info_list: pd.Series, field_name: str) -> pd.Series:
@@ -165,15 +111,6 @@ def expand_manga_data(regime: str = 'return') -> Any:
         data.to_csv(DATA_DIR + 'manga_data_expanded.csv', encoding='UTF-8', index=False)
 
 
-def get_abandoned_titles() -> pd.DataFrame:
-    columns = ['user_url', 'title_url']
-    data = pd.read_csv(DATA_DIR + 'abandoned_titles.csv',
-                       header=None,
-                       names=columns,
-                       dtype='str')
-    return data
-
-
 def get_favorite_titles() -> pd.DataFrame:
     columns = ['user_url', 'title_url']
     data = pd.read_csv(DATA_DIR + 'favorite_titles.csv',
@@ -211,12 +148,3 @@ def merge_user_and_titles() -> None:
     user_info_data['sex'] = user_info_data['sex'].apply(change_sex)
     user_info_data.to_csv(DATA_DIR + 'users_full_info.csv',
                           index=False)
-
-merge_user_and_titles()
-
-def save_csv(data: dict) -> None:
-    file_name = DATA_DIR + 'users_and_titles.csv'
-
-    df = pd.DataFrame.from_records(data,
-                                   columns=['user_id', 'user_link', 'title_id', 'title_link'])
-    df.to_csv(file_name, index=False)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TagORM, AbandonedTitleORM, TitleTagORM, PublisherTitleORM, FavoriteTitleORM)
-from db.everything.queries import (df_to_orm, add_categories, add_id_to_id_conn,
+from db.everything.queries import (df_to_orm, add_categories,
                                    get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user)
 from db.test.data import *
 
@@ -40,29 +40,10 @@ class TestQueries(unittest.TestCase):
                            [AuthorORM, good_author_data],
                            [PublisherORM, good_publisher_data]])
     def test_positive_fill_table(self, orm_name, data):
-        df_to_orm(self.session_factory, orm_name=orm_name, data=data)
+        df_to_orm(self.session_factory, orm_name=orm_name, converted_data=data)
         with self.session_factory() as session:
             result = session.query(orm_name).filter_by(id=1).first()
             self.assertEqual(result.id, 1)
-
-    def test_positive_add_categories(self):
-        add_categories(self.session_factory)
-
-    def test_positive_add_it_to_id_connection(self):
-        right_table = good_abandoned_title
-        right_key = 'title_url'
-        left_table = good_selected_title_data
-        left_key = 'url'
-        df_to_orm(self.session_factory, orm_name=UserORM, data=good_user_data)
-        df_to_orm(self.session_factory, orm_name=TitleORM, data=good_title_data)
-        add_id_to_id_conn(self.session_factory, orm_name=AbandonedTitleORM,
-                          right_table=right_table,
-                          right_key=right_key,
-                          left_table=left_table,
-                          left_key=left_key)
-        with self.session_factory() as session:
-            result = session.query(AbandonedTitleORM).first()
-            self.assertEqual(result.user_id, 1)
 
     def test_positive_get_id(self):
         with self.session_factory() as session:
@@ -111,18 +92,18 @@ class TestQueries(unittest.TestCase):
             add_m2m_to_existing(session,
                                 main_orm_name=TitleORM,
                                 b_p_field='tags',
-                                add_orm_name=TagORM,
-                                data=good_title_tag_data.set_index(good_title_tag_data['url']))
+                                join_orm_name=TagORM,
+                                join_data=good_title_tag_data.set_index(good_title_tag_data['url']))
             expected = '[<TitleTagORM title_id=1, tag_id=1>, <TitleTagORM title_id=1, tag_id=2>, <TitleTagORM title_id=1, tag_id=3>]'
             self.assertEqual(expected, str(session.query(TitleTagORM).filter_by(title_id=1).all()))
 
     def test_positive_add_favorite_titles(self):
-        df_to_orm(self.session_factory, orm_name=UserORM, data=good_user_full_data[['url', 'sex']])
+        df_to_orm(self.session_factory, orm_name=UserORM, converted_data=good_user_full_data[['url', 'sex']])
         with self.session_factory() as session:
             user = session.query(UserORM).first()
             add_m2m(session,
                     main_object=user,
-                    join_orm=TitleORM,
+                    join_orm_name=TitleORM,
                     b_p_field='favorite_titles',
                     join_records=good_user_full_data.iloc[0]['favorite_titles'],
                     key_field_name='url')
