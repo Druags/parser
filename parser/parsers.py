@@ -78,8 +78,8 @@ def check_user_account(driver, user_link):
 
 
 def parse_books(driver, books, write_file_name):
-    with open(f'../data/{write_file_name}.csv', 'a', encoding='UTF-8', newline='') as file, \
-            open(f'../data/failures.csv', 'a', encoding='UTF-8', newline='') as file_failures:
+    with (open(f'../data/{write_file_name}.csv', 'a', encoding='UTF-8', newline='') as file,
+          open('../data/failures.csv', 'a', encoding='UTF-8', newline='') as file_failures):
         csv_writer = csv.writer(file)
         csv_writer_failures = csv.writer(file_failures)
         for book in books:
@@ -87,7 +87,7 @@ def parse_books(driver, books, write_file_name):
                 book.set_attrs(*parse_book(driver, book.link))
                 csv_writer.writerow(book.get_info().values())
                 print('success', book.link)
-            except Exception as e:
+            except Exception:
                 csv_writer_failures.writerow(book.link)
                 print('fail', book.link)
 

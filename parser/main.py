@@ -13,7 +13,7 @@ import modes
 
 def get_active_users(driver, start_id, end_id):
     links = 0
-    with open(f'../data/user_links.csv', 'a', encoding='UTF-8', newline='') as file:
+    with open('../data/user_links.csv', 'a', encoding='UTF-8', newline='') as file:
         csv_writer = csv.writer(file)
         for user_id in range(start_id, end_id):
             user_link = f'https://mangalib.me/user/{user_id}'
@@ -34,11 +34,11 @@ def get_catalog(driver, file_name):
 def get_user_mangas(driver):
     user_links = [
 
-                  'https://mangalib.me/user/262?folder=all',
-                  'https://mangalib.me/user/3732?folder=all',
-                  'https://mangalib.me/user/55643?folder=all']
+        'https://mangalib.me/user/262?folder=all',
+        'https://mangalib.me/user/3732?folder=all',
+        'https://mangalib.me/user/55643?folder=all']
     result_links = set(get_links('unique_title_links'))
-    with open(f'../data/unique_title_links.csv', 'a', encoding='UTF-8', newline='') as file:
+    with open('../data/unique_title_links.csv', 'a', encoding='UTF-8', newline='') as file:
         csv_writer = csv.writer(file)
         for user_link in user_links:
             catalog = parse_user_mangas(driver, user_link)
@@ -53,9 +53,9 @@ def get_users_info(driver, user_links_file='../data/user_links.csv', output_file
     all_user_links = get_links(user_links_file)
     used_links = get_used_links_csv(output_file, link_col=0)
     links = [link for link in all_user_links if link not in used_links]
-    with open(output_file, 'a', encoding='UTF-8', newline='') as file,\
-            open('../backup/favorite_titles.csv', 'a', newline='') as favs,\
-            open('../data/abandoned_titles.csv', 'a',  newline='') as aban:
+    with (open(output_file, 'a', encoding='UTF-8', newline='') as file,
+          open('../backup/favorite_titles.csv', 'a', newline='') as favs,
+          open('../data/abandoned_titles.csv', 'a', newline='') as aban):
 
         csv_writer_main = csv.writer(file)
         csv_writer_favs = csv.writer(favs)
@@ -133,5 +133,4 @@ if __name__ == '__main__':
     end_time = time.time()
     work_time = end_time - start_time
 
-    print(f'Время работы программы: {int(work_time // 3600 )}:{int(work_time // 60 % 60)}:{round(work_time % 60, 2)}')
-
+    print(f'Время работы программы: {int(work_time // 3600)}:{int(work_time // 60 % 60)}:{round(work_time % 60, 2)}')
