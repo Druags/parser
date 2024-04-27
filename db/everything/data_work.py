@@ -77,6 +77,24 @@ def fix_year(year: str) -> str:
         return year
 
 
+def get_user_info(file_path: str) -> pd.DataFrame:
+    user_info = pd.read_csv(file_path)
+    user_info['favorite_tags'] = remove_duplicates_from_list(user_info['favorite_tags'])
+    user_info['favorite_titles'] = remove_duplicates_from_list(user_info['favorite_titles'])
+    user_info['abandoned_titles'] = remove_duplicates_from_list(user_info['abandoned_titles'])
+
+    return user_info
+
+
+def get_title_info(file_path: str) -> pd.DataFrame:
+    title_info = pd.read_csv(file_path)
+    cols = ['in_lists', 'ratings', 'authors', 'artists', 'release_formats', 'tags', 'publishers']
+    for col in cols:
+        title_info[col] = title_info[col].apply(eval)
+
+    return title_info
+
+
 def expand_manga_data(regime: str = 'return') -> Any:
     data = pd.read_csv(DATA_DIR + 'manga_data.csv')
 
@@ -96,10 +114,15 @@ def expand_manga_data(regime: str = 'return') -> Any:
                                 'Загружено глав': 'chapters_uploaded',
                                 'Возрастной рейтинг': 'age_rating',
                                 'link': 'url',
-                                'Формат выпуска': 'release_formats'})
+                                'Формат выпуска': 'release_formats',
+                                'stats': 'in_lists'})
     data = data.drop_duplicates(subset=['url'])
+    data['in_lists'] = data['in_lists'].apply(eval)
+    data['ratings'] = data['ratings'].apply(eval)
     data['name'] = set_name(data['name'], data['alt_name'])
+
     data.drop(columns=['alt_name', 'info_list'], inplace=True)
+
     m2m_cols = ['publishers', 'authors', 'artists', 'release_formats', 'tags']
     data = data.replace(np.nan, None)
     for m2m_col in m2m_cols:
