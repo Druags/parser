@@ -1,16 +1,19 @@
+import time
 import unittest
 
 import numpy
+import pandas as pd
 from parameterized import parameterized
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from db.everything.data_work import get_user_info, get_title_info
 from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
-                                  TagORM, AbandonedTitleORM, TitleTagORM, PublisherTitleORM, FavoriteTitleORM)
-from db.everything.queries import (df_to_orm, add_categories,
-                                   get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user)
+                                  TagORM, TitleTagORM, FavoriteTitleORM, TitleRatingORM)
+from db.everything.queries import (df_to_orm, get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user)
 from db.test.data import *
+from config import DATA_DIR
 
 
 class TestQueries(unittest.TestCase):
@@ -18,11 +21,14 @@ class TestQueries(unittest.TestCase):
         self.engine = create_engine('sqlite:///:memory:')
         Base.metadata.create_all(bind=self.engine)
         self.session_factory = sessionmaker(bind=self.engine)
+        self.startTime = time.time()
 
     def tearDown(self):
         with self.session_factory() as session:
             Base.metadata.drop_all(bind=self.engine)
             session.close()
+        t = time.time() - self.startTime
+        print('%s: %.3f' % (self.id(), t))
 
     def test_add_row_to_table(self):
         with self.session_factory() as session:
@@ -47,12 +53,12 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_get_id(self):
         with self.session_factory() as session:
-            result = get_id(session, AuthorORM, {'name': 'name'})
+            result = get_id(session, orm_name=AuthorORM, key_field_value='name')
             self.assertEqual(1, result)
 
     def test_negative_get_id(self):
         with self.session_factory() as session:
-            result = get_id(session, AuthorORM, numpy.nan)
+            result = get_id(session, orm_name=AuthorORM, key_field_value=numpy.nan)
             self.assertEqual(None, result)
 
     def test_positive_add_full_title(self):
@@ -117,8 +123,32 @@ class TestQueries(unittest.TestCase):
         add_full_user(self.session_factory, good_user_full_data)
         with self.session_factory() as session:
             result = session.query(TitleORM).all()
-
             self.assertEqual(3, len(result))
+
+    def test_positive_add_full_user_file(self):
+        user_full_data = get_user_info(DATA_DIR + 'users_full_info.csv').iloc[0:2]
+        add_full_user(self.session_factory, user_full_data)
+
+        with self.session_factory() as session:
+            result = session.query(FavoriteTitleORM).all()
+            self.assertEqual(42, len(result))
+
+    def test_positive_add_full_title_file(self):
+        title_full_data = get_title_info(DATA_DIR + 'manga_data_expanded.csv').iloc[0:2]
+        add_full_title(self.session_factory, title_full_data)
+
+        with self.session_factory() as session:
+            result = session.query(TitleORM).first()
+            self.assertEqual('mayabi', result.url)
+
+    def test_positive_add_rating_to_title(self):
+        good_data = good_title_full_data.iloc[0:2]
+        add_full_title(self.session_factory, good_data)
+
+        with self.session_factory() as session:
+            title = session.query(TitleORM).first()
+            ratings = session.query(TitleRatingORM).first()
+            self.assertEqual(title.ratings, ratings)
 
 
 # TODO тест с загрузкой данных из файла
