@@ -3,13 +3,11 @@ from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.orm import DeclarativeBase
 from typing import Annotated
 
-
 int_pk = Annotated[int, mapped_column(primary_key=True)]
 
 
 class Base(DeclarativeBase):
     def __repr__(self):
-        """Relationships не используются в repr(), т.к. могут вести к неожиданным подгрузкам"""
         self.repr_cols_num = 3
         self.repr_cols = tuple()
         cols = []
@@ -58,6 +56,8 @@ class TitleORM(Base):
     translation_status: Mapped[int] = mapped_column(ForeignKey('translation_status.id'), nullable=True)
     publication_status: Mapped[int] = mapped_column(ForeignKey('publication_status.id'), nullable=True)
 
+    ratings: Mapped['TitleRatingORM'] = relationship(back_populates='title')
+
     release_formats: Mapped[list['ReleaseFormatORM']] = relationship(
         back_populates='titles',
         secondary='title_release_format'
@@ -91,6 +91,25 @@ class TitleORM(Base):
 
     def to_dict(self):
         return {'id': self.id, 'url': self.url}
+
+
+class TitleRatingORM(Base):
+    __tablename__ = 'title_ratings'
+
+    id: Mapped[int_pk]
+    title_id: Mapped[int] = mapped_column(ForeignKey('title.id'))
+    title: Mapped['TitleORM'] = relationship(back_populates='ratings')
+
+    qty_1: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_2: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_3: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_4: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_5: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_6: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_7: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_8: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_9: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty_10: Mapped[int] = mapped_column(Integer, nullable=True)
 
 
 class ArtistORM(Base):
