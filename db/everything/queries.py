@@ -4,7 +4,7 @@ from sqlalchemy.sql.expression import func
 from sqlalchemy.orm.session import sessionmaker, Session
 from tqdm import tqdm
 
-from db.everything.data_work import expand_manga_data, get_user_info
+from db.everything.data_work import expand_manga_data, get_user_info, get_title_info
 from db.everything.models import (Base, UserORM, TitleORM, TagORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TranslationStatusORM, ReleaseFormatORM,
@@ -20,21 +20,7 @@ def create_tables(engine) -> None:
 
 
 def fill_tables(session_factory: sessionmaker) -> None:
-    tables_content = (TableContent(AuthorORM, data.authors),
-                      TableContent(ArtistORM, data.artists),
-                      TableContent(PublisherORM, data.publishers),
-                      TableContent(TagORM, data.tags),
-                      TableContent(TypeORM, data.title_types),
-                      TableContent(PublicationStatusORM, data.publication_statuses),
-                      TableContent(AgeRatingORM, data.age_ratings),
-                      TableContent(TranslationStatusORM, data.translation_statuses),
-                      TableContent(ReleaseFormatORM, data.release_formats)
-                      )
-
-    for orm_name, table_content in tables_content:
-        df_to_orm(session_factory, orm_name=orm_name, converted_data=table_content)
-
-    titles = expand_manga_data()
+    titles = get_title_info(DATA_DIR + 'manga_data_expanded.csv')
     add_full_title(session_factory, titles)
 
     user_data = get_user_info(DATA_DIR + 'users_full_info.csv')
@@ -49,8 +35,7 @@ def add_full_user(session_factory: sessionmaker, users_info: pd.DataFrame) -> No
             session.add(user)
             m2m_relations = (
                 TableRelation(TitleORM, 'favorite_titles', getattr(row, 'favorite_titles')),
-                TableRelation(TitleORM, 'abandoned_titles', getattr(row, 'abandoned_titles')),
-                TableRelation(TagORM, 'favorite_tags', getattr(row, 'favorite_tags'), 'name')
+                TableRelation(TitleORM, 'abandoned_titles', getattr(row, 'abandoned_titles'))
             )
 
             for element in m2m_relations:
@@ -61,7 +46,7 @@ def add_full_user(session_factory: sessionmaker, users_info: pd.DataFrame) -> No
                         join_records=element.join_records,
                         key_field_name=element.key_field_name)
 
-        session.flush()
+            session.flush()
         session.commit()
 
 
@@ -100,20 +85,47 @@ def add_full_title(session_factory: sessionmaker, titles_info: pd.DataFrame) -> 
                         b_p_field=element.bp_field_name,
                         join_records=element.join_records)
 
-            add_ratings(title, getattr(row, 'ratings'))
+            add_o2m(main_object=title,
+                    b_p_field='ratings',
+                    join_data=getattr(row, 'ratings'),
+                    join_orm_name=TitleRatingORM)
 
         session.flush()
         session.commit()
 
 
-def add_ratings(main_object, join_data: dict):
-    new_ratings = {}
-    for rating in join_data:
-        new_ratings[f'qty_{rating}'] = join_data[rating]
+def add_o2m_to_existing(session_factory: sessionmaker,
+                        main_orm_name: Type[Base],
+                        b_p_field: str,
+                        join_orm_name: Type[Base],
+                        join_data: pd.DataFrame):
+    with session_factory() as session:
+        main_objects = session.query(main_orm_name).all()
 
-    title_ratings = TitleRatingORM(title_id=main_object.id, **new_ratings)
-    main_object.ratings = title_ratings
+        for main_object in tqdm(main_objects):
+            try:
+                data_part = join_data.loc[main_object.url][b_p_field]
+            except KeyError:
+                print(main_object)
+                continue
+            add_o2m(main_object=main_object,
+                    b_p_field=b_p_field,
+                    join_orm_name=join_orm_name,
+                    join_data=data_part)
+        session.flush()
+        session.commit()
 
+
+def add_o2m(main_object,
+            b_p_field: str,
+            join_orm_name: Type[Base],
+            join_data: dict):
+    for rating, qty in join_data.items():
+        getattr(main_object, b_p_field).append(join_orm_name(name=rating, qty=qty))
+
+
+# TODO создаёт дубликаты, поскольку не проверяет,
+#  что объект уже существует, для оценок это важно
 
 def add_m2m_to_existing(session: Session, *,
                         main_orm_name: Type[Base],
