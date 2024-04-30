@@ -56,7 +56,7 @@ class TitleORM(Base):
     translation_status: Mapped[int] = mapped_column(ForeignKey('translation_status.id'), nullable=True)
     publication_status: Mapped[int] = mapped_column(ForeignKey('publication_status.id'), nullable=True)
 
-    ratings: Mapped['TitleRatingORM'] = relationship(back_populates='title')
+    ratings: Mapped[list['TitleRatingORM']] = relationship(back_populates='title')
 
     release_formats: Mapped[list['ReleaseFormatORM']] = relationship(
         back_populates='titles',
@@ -94,22 +94,14 @@ class TitleORM(Base):
 
 
 class TitleRatingORM(Base):
-    __tablename__ = 'title_ratings'
+    __tablename__ = 'title_rating'
 
     id: Mapped[int_pk]
+    name: Mapped[SmallInteger] = mapped_column(SmallInteger)
+    qty: Mapped[int] = mapped_column(Integer)
+
     title_id: Mapped[int] = mapped_column(ForeignKey('title.id'))
     title: Mapped['TitleORM'] = relationship(back_populates='ratings')
-
-    qty_1: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_2: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_3: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_4: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_5: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_6: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_7: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_8: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_9: Mapped[int] = mapped_column(Integer, nullable=True)
-    qty_10: Mapped[int] = mapped_column(Integer, nullable=True)
 
 
 class ArtistORM(Base):
