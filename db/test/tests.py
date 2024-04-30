@@ -11,7 +11,8 @@ from db.everything.data_work import get_user_info, get_title_info
 from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TagORM, TitleTagORM, FavoriteTitleORM, TitleRatingORM)
-from db.everything.queries import (df_to_orm, get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user)
+from db.everything.queries import (df_to_orm, get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user,
+                                   add_o2m, add_o2m_to_existing)
 from db.test.data import *
 from config import DATA_DIR
 
@@ -141,14 +142,34 @@ class TestQueries(unittest.TestCase):
             result = session.query(TitleORM).first()
             self.assertEqual('mayabi', result.url)
 
-    def test_positive_add_rating_to_title(self):
-        good_data = good_title_full_data.iloc[0:2]
+    def test_positive_add_o2m(self):
+        good_data = good_title_full_data.iloc[1:3]
+        ratings = {10: 100}
         add_full_title(self.session_factory, good_data)
 
         with self.session_factory() as session:
             title = session.query(TitleORM).first()
-            ratings = session.query(TitleRatingORM).first()
-            self.assertEqual(title.ratings, ratings)
+            add_o2m(main_object=title,
+                    b_p_field='ratings',
+                    join_data=ratings,
+                    join_orm_name=TitleRatingORM)
+            session.flush()
+            session.commit()
+            result = session.query(TitleRatingORM).first()
+
+            self.assertEqual(result.qty, 100)
+
+    def test_positive_add_o2m_to_existing(self):
+        good_data = good_title_full_data.iloc[0:2]
+        add_full_title(self.session_factory, good_data)
+        add_o2m_to_existing(self.session_factory,
+                            main_orm_name=TitleORM,
+                            join_orm_name=TitleRatingORM,
+                            b_p_field='ratings',
+                            join_data=good_data.set_index(good_data['url']))
+        with self.session_factory() as session:
+            result = session.query(TitleRatingORM).first().name
+            self.assertEqual(10, result)
 
 
 # TODO тест с загрузкой данных из файла
