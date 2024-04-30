@@ -79,6 +79,7 @@ def fix_year(year: str) -> str:
 
 def get_user_info(file_path: str) -> pd.DataFrame:
     user_info = pd.read_csv(file_path)
+    user_info = user_info.replace(np.nan, None)
     user_info['favorite_tags'] = remove_duplicates_from_list(user_info['favorite_tags'])
     user_info['favorite_titles'] = remove_duplicates_from_list(user_info['favorite_titles'])
     user_info['abandoned_titles'] = remove_duplicates_from_list(user_info['abandoned_titles'])
@@ -88,6 +89,7 @@ def get_user_info(file_path: str) -> pd.DataFrame:
 
 def get_title_info(file_path: str) -> pd.DataFrame:
     title_info = pd.read_csv(file_path)
+    title_info = title_info.replace(np.nan, None)
     cols = ['in_lists', 'ratings', 'authors', 'artists', 'release_formats', 'tags', 'publishers']
     for col in cols:
         title_info[col] = title_info[col].apply(eval)
