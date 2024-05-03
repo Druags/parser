@@ -171,6 +171,17 @@ class TestQueries(unittest.TestCase):
             result = session.query(TitleRatingORM).first().name
             self.assertEqual(10, result)
 
+    def test_positive_add_o2m_to_existing_file(self):
+        title_full_data = get_title_info(DATA_DIR + 'manga_data_expanded.csv').iloc[0:2]
+        add_full_title(self.session_factory, title_full_data)
+        add_o2m_to_existing(self.session_factory,
+                            main_orm_name=TitleORM,
+                            join_orm_name=TitleRatingORM,
+                            b_p_field='ratings',
+                            join_data=title_full_data.set_index(title_full_data['url']))
+        with self.session_factory() as session:
+            result = session.query(TitleRatingORM).all()
+            self.assertEqual(22, len(result))
 
 # TODO тест с загрузкой данных из файла
 if __name__ == '__main__':
