@@ -3,12 +3,11 @@ import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from everything.queries import create_tables, fill_tables
-from config import Settings
+from everything.queries import create_tables, fill_tables, test
+from config import settings
 
 
 def main() -> None:
-    settings = Settings()
     mysql_engine = create_engine(
         url=settings.DATABASE_URL_mysql
     )
@@ -16,7 +15,7 @@ def main() -> None:
     session_factory = sessionmaker(mysql_engine)
     # create_tables(mysql_engine)
     # fill_tables(session_factory)
-    # add_connections(session_factory)
+    test(session_factory)
 
 
 if __name__ == '__main__':

@@ -99,8 +99,8 @@ class TitleRatingORM(Base):
     id: Mapped[int_pk]
     name: Mapped[SmallInteger] = mapped_column(SmallInteger)
     qty: Mapped[int] = mapped_column(Integer)
-
     title_id: Mapped[int] = mapped_column(ForeignKey('title.id'))
+
     title: Mapped['TitleORM'] = relationship(back_populates='ratings')
 
 

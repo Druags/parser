@@ -4,13 +4,12 @@ from sqlalchemy.sql.expression import func
 from sqlalchemy.orm.session import sessionmaker, Session
 from tqdm import tqdm
 
-from db.everything.data_work import expand_manga_data, get_user_info, get_title_info
+from db.everything.data_work import get_user_info, get_title_info
 from db.everything.models import (Base, UserORM, TitleORM, TagORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TranslationStatusORM, ReleaseFormatORM,
                                   PublicationStatusORM, AgeRatingORM, TypeORM, TitleRatingORM)
-from db.everything import data
-from db.everything.data_classes import TableContent, TableRelation
+from db.everything.data_classes import TableRelation
 from config import DATA_DIR
 
 
@@ -106,7 +105,6 @@ def add_o2m_to_existing(session_factory: sessionmaker,
             try:
                 data_part = join_data.loc[main_object.url][b_p_field]
             except KeyError:
-                print(main_object)
                 continue
             add_o2m(main_object=main_object,
                     b_p_field=b_p_field,
@@ -121,7 +119,8 @@ def add_o2m(main_object,
             join_orm_name: Type[Base],
             join_data: dict):
     for rating, qty in join_data.items():
-        getattr(main_object, b_p_field).append(join_orm_name(name=rating, qty=qty))
+        (getattr(main_object, b_p_field).
+         append(join_orm_name(name=rating, qty=qty)))
 
 
 # TODO создаёт дубликаты, поскольку не проверяет,
