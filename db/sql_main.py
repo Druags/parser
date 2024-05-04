@@ -3,7 +3,7 @@ import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from everything.queries import create_tables, fill_tables, test
+from everything.queries import create_tables, fill_tables
 from config import settings
 
 
@@ -15,7 +15,6 @@ def main() -> None:
     session_factory = sessionmaker(mysql_engine)
     # create_tables(mysql_engine)
     # fill_tables(session_factory)
-    test(session_factory)
 
 
 if __name__ == '__main__':
