@@ -184,3 +184,12 @@ def df_to_orm(session_factory: sessionmaker,
                          for row in converted_data.itertuples()])
         session.flush()
         session.commit()
+
+
+def get_max_user_url(session_factory: sessionmaker) -> int:
+    with session_factory() as session:
+        try:
+            max_url = session.query(func.max(UserORM.url)).first()[0]
+        except AttributeError:
+            max_url = 0
+    return max_url
