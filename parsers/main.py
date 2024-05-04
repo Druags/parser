@@ -1,26 +1,21 @@
 import csv
+
+import pandas as pd
+import selenium.webdriver.chromium.webdriver
 from selenium import webdriver
 import os
 import time
 import undetected_chromedriver as uc
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from webdriver_manager.chrome import ChromeDriverManager
 
-from book import create_books_data
-from files import get_links, write_to_csv, get_used_links_csv
-from parsers import parse_catalog, parse_book, check_user_account, parse_user_info, parse_user_mangas
-import modes
-
-
-def get_active_users(driver, start_id, end_id):
-    links = 0
-    with open('../data/user_links.csv', 'a', encoding='UTF-8', newline='') as file:
-        csv_writer = csv.writer(file)
-        for user_id in range(start_id, end_id):
-            user_link = f'https://mangalib.me/user/{user_id}'
-            if check_user_account(driver, user_link):
-                csv_writer.writerow([user_link])
-                links += 1
-        print(f'Заполненных аккаунтов: {links}')
+from config import settings
+from db.everything.queries import get_max_user_url
+from parsers.book import create_books_data
+from parsers.files import get_links, write_to_csv, get_used_links_csv
+from parsers.parsers import parse_catalog, parse_book, check_user_account, parse_user_info, parse_user_mangas
+import parsers.modes as modes
 
 
 def get_catalog(driver, file_name):
@@ -33,7 +28,6 @@ def get_catalog(driver, file_name):
 
 def get_user_mangas(driver):
     user_links = [
-
         'https://mangalib.me/user/262?folder=all',
         'https://mangalib.me/user/3732?folder=all',
         'https://mangalib.me/user/55643?folder=all']
@@ -49,7 +43,9 @@ def get_user_mangas(driver):
                 csv_writer.writerow([new_link])
 
 
-def get_users_info(driver, user_links_file='../data/user_links.csv', output_file='../data/users_info.csv'):
+def get_users_info(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
+                   user_links_file: str = '../data/user_links.csv',
+                   output_file: str = '../data/users_info.csv'):
     all_user_links = get_links(user_links_file)
     used_links = get_used_links_csv(output_file, link_col=0)
     links = [link for link in all_user_links if link not in used_links]
@@ -74,6 +70,26 @@ def get_users_info(driver, user_links_file='../data/user_links.csv', output_file
                 print(user_link, e)
 
 
+def get_users_info_test(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
+                        user_links: pd.DataFrame = None) -> pd.DataFrame:
+    # start_id = 125850, end_id = 130000
+    # last_used_link = get_max_user_url(session_factory)  # заменить на функцию
+    user_info = pd.DataFrame(columns=['url', 'sex', 'favorite_tags', 'favorite_titles', 'abandoned_titles'])
+    for row in user_links.itertuples():
+        url = row.url
+        if row.Index % 70 == 0:
+            driver.quit()
+            driver = start_driver()
+        try:
+            url = 'https://mangalib.me/user/' + str(url)
+            user_data = parse_user_info(driver, url)
+            if user_data:
+                user_info.loc[len(user_info.index)] = [row.url, *user_data]
+        except Exception as e:
+            print(row.url, e)
+    return user_info
+
+
 def start_driver(undetected=True):
     if undetected:
         chrome_options = uc.ChromeOptions()
@@ -89,7 +105,8 @@ def start_driver(undetected=True):
         driver = uc.Chrome(
             options=chrome_options,
             seleniumwire_options=proxy_options,
-            driver_executable_path=ChromeDriverManager().install()
+            driver_executable_path=ChromeDriverManager().install(),
+            use_subprocess=False
         )
     else:
         chrome_options = webdriver.ChromeOptions()
@@ -115,8 +132,6 @@ def main(mode=None):
         get_user_mangas(driver)
     elif mode == modes.PARSE_BOOK:
         values = parse_book(driver, book_link)
-    elif mode == modes.USER_STATUS:
-        get_active_users(driver, start_id=125850, end_id=130000)
     elif mode == modes.USER_INFO:
         get_users_info(driver)
     elif mode == modes.CREATE_BOOKS_DATA:
@@ -129,6 +144,11 @@ if __name__ == '__main__':
     mode = modes.USER_INFO
     start_time = time.time()
     main(mode)
+
+    mysql_engine = create_engine(
+        url=settings.DATABASE_URL_mysql
+    )
+    session_factory = sessionmaker(mysql_engine)
 
     end_time = time.time()
     work_time = end_time - start_time

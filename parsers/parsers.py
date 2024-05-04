@@ -7,6 +7,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from creds import mail, password
+from parsers.help_functions import get_user_sex, get_user_favorite_tags, user_is_active
 
 
 def authorize(driver):
@@ -22,40 +23,27 @@ def authorize(driver):
     time.sleep(3)
 
 
-def parse_user_info(driver, user_link):
+def parse_user_info(driver, user_link: str):
     driver.get(user_link + '?folder=5')
-    if '404' not in driver.title:
-        WebDriverWait(driver, 20).until_not(
-            EC.presence_of_element_located((By.CLASS_NAME, 'loader-wrapper'))
-        )
-        soup = BeautifulSoup(driver.page_source)
-        genres = soup.find('div', {'class': 'page-modals'}). \
-            find('div', {'class': 'user-genres'}). \
-            find_all('div', {'class': 'user-genres__genre'})
-        genres_amount = {}
-        for genre in genres:
-            genre_name = genre.find('div', {'class': 'user-genres__name'}).text.strip()
-            genre_amount = genre.find('div', {'class': 'user-genres__amount'}).text.strip()
-            genres_amount[genre_name] = genre_amount
+    if '404' in driver.title:
+        print('404')
+        return
 
-        try:
-            sex = soup.find('div', {'class': 'page-modals'}).find('table', {'class': 'profile-info'}). \
-                find_all('tr', {'class': 'profile-info__row'})[1].find('td', {'class': 'profile-info__value'}).text
-        except:
-            sex = 'Unknown'
+    WebDriverWait(driver, 20).until_not(
+        EC.presence_of_element_located((By.CLASS_NAME, 'loader-wrapper'))
+    )
 
-        try:
-            favorites_links = parse_user_mangas(driver, user_link + '?folder=5')
-        except Exception as e:
-            print('Ошибка при поиске любимых тайтлов')
-            favorites_links = []
-        try:
-            abandoned_links = parse_user_mangas(driver, user_link + '?folder=3')
-        except Exception as e:
-            print('Ошибка при поиске брошенных тайтлов')
-            abandoned_links = []
+    soup = BeautifulSoup(driver.page_source, features="html.parser")
+    if not user_is_active(soup):
+        print('User is inactive')
+        return
 
-        return sex, genres_amount, favorites_links, abandoned_links
+    favorite_tags = get_user_favorite_tags(soup)
+    sex = get_user_sex(soup)
+    favorites_links = parse_user_mangas(driver, user_link + '?folder=5')
+    abandoned_links = parse_user_mangas(driver, user_link + '?folder=3')
+
+    return sex, favorite_tags, favorites_links, abandoned_links
 
 
 # todo разбить пользователей на категории по числу прочитанной манги
@@ -164,19 +152,25 @@ def scroll_down(driver):
 
 
 # TODO парсит дубликаты
-def parse_user_mangas(driver, user_link, links=None):
-    if links is None:
-        links = set()
-    driver.get(user_link)
-    scroll_down(driver)
-    soup = BeautifulSoup(driver.page_source)
-    bookmarks = (soup.find('div', {'class': "bookmark__list"})
-                 .find_all('div', {'class': 'bookmark-item'}))
-    for bookmark in bookmarks:
-        raw_link = bookmark.find('div', {'class': 'bookmark-item__info-header'}).find('a').get('href')
-        clean_link = 'https://mangalib.me' + raw_link.split('?')[0]
-        if clean_link not in links:
-            links.add(clean_link)
+def parse_user_mangas(driver, user_url: str) -> set:
+    links = set()
+    try:
+        driver.get(user_url)
+        scroll_down(driver)
+        soup = BeautifulSoup(driver.page_source, features="html.parser")
+        bookmarks = (soup.find('div', {'class': "bookmark__list"})
+                     .find_all('div', {'class': 'bookmark-item'}))
+        for bookmark in bookmarks:
+            raw_link = bookmark.find('div', {'class': 'bookmark-item__info-header'}).find('a').get('href')
+            clean_link = 'https://mangalib.me' + raw_link.split('?')[0]
+            if clean_link not in links:
+                links.add(clean_link)
+    except Exception as e:
+        if '?folder=5' in user_url:
+            print('Ошибка при поиске любимых тайтлов')
+        elif '?folder=3' in user_url:
+            print('Ошибка при поиске брошеных тайтлов')
+        print(e)
 
     return links
 

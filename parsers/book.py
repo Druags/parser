@@ -1,6 +1,6 @@
-from files import upload_result, get_links, get_used_links_csv
+from parsers.files import upload_result, get_links, get_used_links_csv
 
-from parsers import parse_books, authorize
+from parsers.parsers import parse_books, authorize
 
 
 class Book:
