@@ -2,7 +2,6 @@ import time
 import unittest
 
 import numpy
-import pandas as pd
 from parameterized import parameterized
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -12,7 +11,7 @@ from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TagORM, TitleTagORM, FavoriteTitleORM, TitleRatingORM)
 from db.everything.queries import (df_to_orm, get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user,
-                                   add_o2m, add_o2m_to_existing)
+                                   add_o2m, add_o2m_to_existing, get_max_user_url, get_min_empty_user_url)
 from db.test.data import *
 from config import DATA_DIR
 
@@ -183,6 +182,11 @@ class TestQueries(unittest.TestCase):
             result = session.query(TitleRatingORM).all()
             self.assertEqual(22, len(result))
 
-# TODO тест с загрузкой данных из файла
+    def test_positive_get_user_max_url(self):
+        add_full_user(self.session_factory, good_user_full_data)
+        result = get_max_user_url(self.session_factory)
+        self.assertEqual(1, result)
+
+
 if __name__ == '__main__':
     unittest.main()
