@@ -37,3 +37,4 @@ good_title_full_data = pd.DataFrame({'type': ['Манхва', 'Манга'],
                                      'age_rating': ['Unknown', '18+'],
                                      'release_formats': [{'Test_format'}, {'Test_format', 'Test_format_2'}]
                                      })
+

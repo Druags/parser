@@ -16,3 +16,4 @@ class TableRelation:
     bp_field_name: str
     join_records: set
     key_field_name: str = 'url'
+

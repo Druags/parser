@@ -10,8 +10,8 @@ from db.everything.data_work import get_user_info, get_title_info
 from db.everything.models import (UserORM, Base, TitleORM,
                                   AuthorORM, ArtistORM, PublisherORM,
                                   TagORM, TitleTagORM, FavoriteTitleORM, TitleRatingORM)
-from db.everything.queries import (df_to_orm, get_id, add_full_title, add_m2m, add_m2m_to_existing, add_full_user,
-                                   add_o2m, add_o2m_to_existing, get_max_user_url, get_min_empty_user_url)
+from db.everything.queries import (df_to_orm, get_id, add_full_titles, add_m2m, add_m2m_to_existing, add_full_users,
+                                   add_o2m, add_o2m_to_existing, get_max_user_url)
 from db.test.data import *
 from config import DATA_DIR
 
@@ -62,38 +62,38 @@ class TestQueries(unittest.TestCase):
             self.assertEqual(None, result)
 
     def test_positive_add_full_title(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             result = session.query(TitleORM).filter_by(id=1).first()
             self.assertEqual(1, result.id)
 
     def test_positive_connection_of_title_and_author(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             result = session.query(AuthorORM).filter_by(id=1).first()
 
             self.assertEqual('Test_Author', result.name)
 
     def test_positive_connection_of_title_and_existing_author(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             result = session.query(AuthorORM).filter_by(id=1).first()
             self.assertEqual('Test_Author', result.name)
 
     def test_positive_connection_of_title_and_new_author(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             result = session.query(AuthorORM).filter_by(id=2).first()
             self.assertEqual(2, result.id)
 
     def test_positive_add_m2m(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             expected = '[<TitleTagORM title_id=1, tag_id=1>, <TitleTagORM title_id=1, tag_id=2>]'
             self.assertEqual(expected, str(session.query(TitleTagORM).filter_by(title_id=1).all()))
 
     def test_positive_update_object(self):
-        add_full_title(self.session_factory, good_title_full_data)
+        add_full_titles(self.session_factory, good_title_full_data)
         with self.session_factory() as session:
             add_m2m_to_existing(session,
                                 main_orm_name=TitleORM,
@@ -120,14 +120,14 @@ class TestQueries(unittest.TestCase):
         self.assertEqual(expected, real)
 
     def test_positive_add_full_user(self):
-        add_full_user(self.session_factory, good_user_full_data)
+        add_full_users(self.session_factory, good_user_full_data)
         with self.session_factory() as session:
             result = session.query(TitleORM).all()
             self.assertEqual(3, len(result))
 
     def test_positive_add_full_user_file(self):
         user_full_data = get_user_info(DATA_DIR + 'users_full_info.csv').iloc[0:2]
-        add_full_user(self.session_factory, user_full_data)
+        add_full_users(self.session_factory, user_full_data)
 
         with self.session_factory() as session:
             result = session.query(FavoriteTitleORM).all()
@@ -135,7 +135,7 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_add_full_title_file(self):
         title_full_data = get_title_info(DATA_DIR + 'manga_data_expanded.csv').iloc[0:2]
-        add_full_title(self.session_factory, title_full_data)
+        add_full_titles(self.session_factory, title_full_data)
 
         with self.session_factory() as session:
             result = session.query(TitleORM).first()
@@ -144,7 +144,7 @@ class TestQueries(unittest.TestCase):
     def test_positive_add_o2m(self):
         good_data = good_title_full_data.iloc[1:3]
         ratings = {10: 100}
-        add_full_title(self.session_factory, good_data)
+        add_full_titles(self.session_factory, good_data)
 
         with self.session_factory() as session:
             title = session.query(TitleORM).first()
@@ -160,7 +160,7 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_add_o2m_to_existing(self):
         good_data = good_title_full_data.iloc[0:2]
-        add_full_title(self.session_factory, good_data)
+        add_full_titles(self.session_factory, good_data)
         add_o2m_to_existing(self.session_factory,
                             main_orm_name=TitleORM,
                             join_orm_name=TitleRatingORM,
@@ -172,7 +172,7 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_add_o2m_to_existing_file(self):
         title_full_data = get_title_info(DATA_DIR + 'manga_data_expanded.csv').iloc[0:2]
-        add_full_title(self.session_factory, title_full_data)
+        add_full_titles(self.session_factory, title_full_data)
         add_o2m_to_existing(self.session_factory,
                             main_orm_name=TitleORM,
                             join_orm_name=TitleRatingORM,
@@ -183,7 +183,7 @@ class TestQueries(unittest.TestCase):
             self.assertEqual(22, len(result))
 
     def test_positive_get_user_max_url(self):
-        add_full_user(self.session_factory, good_user_full_data)
+        add_full_users(self.session_factory, good_user_full_data)
         result = get_max_user_url(self.session_factory)
         self.assertEqual(1, result)
 
