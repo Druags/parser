@@ -7,6 +7,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from creds import mail, password
+from parsers.data_classes import UserInfo, UserIsInactiveException, PageNotFound
 from parsers.help_functions import get_user_sex, get_user_favorite_tags, user_is_active
 
 
@@ -23,11 +24,10 @@ def authorize(driver):
     time.sleep(3)
 
 
-def parse_user_info(driver, user_link: str):
-    driver.get(user_link + '?folder=5')
+def parse_user_info(driver, user_url: str):
+    driver.get(user_url + '?folder=5')
     if '404' in driver.title:
-        print('404')
-        return
+        raise PageNotFound('Страница пользователя недоступна или заблокирована')
 
     WebDriverWait(driver, 20).until_not(
         EC.presence_of_element_located((By.CLASS_NAME, 'loader-wrapper'))
@@ -35,15 +35,14 @@ def parse_user_info(driver, user_link: str):
 
     soup = BeautifulSoup(driver.page_source, features="html.parser")
     if not user_is_active(soup):
-        print('User is inactive')
-        return
+        raise UserIsInactiveException('Пользователь не соответствует поставленным требованиям')
 
     favorite_tags = get_user_favorite_tags(soup)
     sex = get_user_sex(soup)
-    favorites_links = parse_user_mangas(driver, user_link + '?folder=5')
-    abandoned_links = parse_user_mangas(driver, user_link + '?folder=3')
+    favorites_links = parse_user_mangas(driver, user_url + '?folder=5')
+    abandoned_links = parse_user_mangas(driver, user_url + '?folder=3')
 
-    return sex, favorite_tags, favorites_links, abandoned_links
+    return UserInfo(sex, favorite_tags, favorites_links, abandoned_links)
 
 
 # todo разбить пользователей на категории по числу прочитанной манги
