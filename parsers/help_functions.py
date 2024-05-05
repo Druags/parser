@@ -1,16 +1,25 @@
 from bs4 import BeautifulSoup
 
 
-def get_user_sex(soup: BeautifulSoup) -> str:
+def get_user_sex(soup: BeautifulSoup) -> int:
     try:
         page_modals = soup.find('div', {'class': 'page-modals'})
         profile_info = page_modals.find('table', {'class': 'profile-info'})
         info_row = profile_info.find_all('tr', {'class': 'profile-info__row'})[1]
         sex = info_row.find('td', {'class': 'profile-info__value'}).text
+        if sex == 'Женский':
+            sex = 0
+        elif sex == 'Мужской':
+            sex = 1
+    except IndexError:
+        sex = 2
+        print('Пол не указан')
+    except AttributeError:
+        sex = 2
+        print('Пол не указан, но есть описание')
     except Exception as e:
-        sex = 'Unknown'
-        print('Ошибка при поиске пола пользователя')
-        print(e)
+        sex = 2
+        print('Неизвестная ошибка при поиске пола', e)
     return sex
 
 
@@ -25,22 +34,6 @@ def get_user_favorite_tags(soup: BeautifulSoup) -> dict:
         genres_amount[genre_name] = genre_amount
     return genres_amount
 
-def check_user_account(driver, user_link):
-
-
-        WebDriverWait(driver, 20).until_not(
-            EC.presence_of_element_located((By.CLASS_NAME, 'loader-wrapper'))
-        )
-        soup = BeautifulSoup(driver.page_source)
-        try:
-            bookmarks = soup.find('div', {'class': 'bookmark-menu'}).find_all('div', {'class': 'menu__item'})
-            books_n = int(bookmarks[0].find('span', {'class': 'bookmark-menu__label'}).text)
-            books_favorite_n = int(bookmarks[5].find('span', {'class': 'bookmark-menu__label'}).text)
-            if not (books_favorite_n == 0 or books_n < 50):
-                return True
-        except Exception as error:
-            print(error)
-            print(user_link)
 
 def user_is_active(soup) -> bool:
     try:
@@ -51,6 +44,6 @@ def user_is_active(soup) -> bool:
 
         if not (books_favorite_n == 0 or books_n < 50):
             return True
-    except Exception as error:
-        print('User inactive', error)
+    except Exception as e:
+        print('Неизвестная ошибка', e)
 
