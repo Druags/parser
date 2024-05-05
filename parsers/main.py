@@ -11,10 +11,10 @@ from sqlalchemy.orm import sessionmaker
 from webdriver_manager.chrome import ChromeDriverManager
 
 from config import settings
-from db.everything.queries import get_max_user_url
+from db.everything.queries import get_max_user_url, add_full_users
 from parsers.book import create_books_data
 from parsers.files import get_links, write_to_csv, get_used_links_csv
-from parsers.parsers import parse_catalog, parse_book, check_user_account, parse_user_info, parse_user_mangas
+from parsers.parsers_funcs import parse_catalog, parse_book, check_user_account, parse_user_info, parse_user_mangas
 import parsers.modes as modes
 
 
@@ -71,23 +71,27 @@ def get_users_info(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
 
 
 def get_users_info_test(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
-                        user_links: pd.DataFrame = None) -> pd.DataFrame:
-    # start_id = 125850, end_id = 130000
-    # last_used_link = get_max_user_url(session_factory)  # заменить на функцию
+                        session_factory,
+                        user_ids: list = None,
+                        amount: int = 1) -> None:
+    if not user_ids:
+        last_used_url = get_max_user_url(session_factory)
+        user_ids = range(last_used_url + 1, last_used_url + amount + 1)
+
     user_info = pd.DataFrame(columns=['url', 'sex', 'favorite_tags', 'favorite_titles', 'abandoned_titles'])
-    for row in user_links.itertuples():
-        url = row.url
-        if row.Index % 70 == 0:
+    for i, user_id in enumerate(user_ids):
+        if i % 70 == 0:
             driver.quit()
             driver = start_driver()
         try:
-            url = 'https://mangalib.me/user/' + str(url)
-            user_data = parse_user_info(driver, url)
+            full_url = 'https://mangalib.me/user/' + str(user_id)
+            user_data = parse_user_info(driver, full_url)
             if user_data:
-                user_info.loc[len(user_info.index)] = [row.url, *user_data]
+                user_info.loc[i] = [user_id, *user_data]
         except Exception as e:
-            print(row.url, e)
-    return user_info
+            print('https://mangalib.me/user/' + str(user_id), e)
+    add_full_users(session_factory, user_info)
+    driver.close()
 
 
 def start_driver(undetected=True):
@@ -137,7 +141,7 @@ def main(mode=None):
     elif mode == modes.CREATE_BOOKS_DATA:
         create_books_data(driver, read_file_name='failures', auth=True)
     # driver.get_screenshot_as_file('final.png')
-    driver.close()
+    driver.dispose()
 
 
 if __name__ == '__main__':
