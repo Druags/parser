@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Type
+from typing import Type, Union
 from sqlalchemy.sql.expression import func
 from sqlalchemy.orm.session import sessionmaker, Session
 from tqdm import tqdm
@@ -20,13 +20,14 @@ def create_tables(engine) -> None:
 
 def fill_tables(session_factory: sessionmaker) -> None:
     titles = get_title_info(DATA_DIR + 'manga_data_expanded.csv')
-    add_full_title(session_factory, titles)
+    add_full_titles(session_factory, titles)
 
     user_data = get_user_info(DATA_DIR + 'users_full_info.csv')
-    add_full_user(session_factory, user_data)
+    add_full_users(session_factory, user_data)
 
 
-def add_full_user(session_factory: sessionmaker, users_info: pd.DataFrame) -> None:
+def add_full_users(session_factory: sessionmaker,
+                   users_info: pd.DataFrame) -> None:
     with session_factory() as session:
         for row in tqdm(users_info.itertuples()):
             user = UserORM(url=getattr(row, 'url'),
@@ -49,7 +50,7 @@ def add_full_user(session_factory: sessionmaker, users_info: pd.DataFrame) -> No
         session.commit()
 
 
-def add_full_title(session_factory: sessionmaker, titles_info: pd.DataFrame) -> None:
+def add_full_titles(session_factory: sessionmaker, titles_info: pd.DataFrame) -> None:
     with session_factory() as session:
         for row in tqdm(titles_info.itertuples()):
             title = TitleORM(url=getattr(row, 'url'),
@@ -190,6 +191,10 @@ def get_max_user_url(session_factory: sessionmaker) -> int:
     with session_factory() as session:
         try:
             max_url = session.query(func.max(UserORM.url)).first()[0]
-        except AttributeError:
-            max_url = 0
+            if max_url is None:
+                max_url = 3
+        except Exception as e:
+            print(e)
+            max_url = 3
+
     return max_url
