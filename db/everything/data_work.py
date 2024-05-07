@@ -26,17 +26,6 @@ def get_field_values(info_list: pd.Series, field_name: str) -> pd.Series:
     return pd.Series(field_values)
 
 
-def set_name(old_names: pd.Series, new_names: pd.Series) -> list:
-    names = []
-    for old_name, new_name in zip(old_names, new_names):
-        if old_name == 'name':
-            names.append(new_name)
-        else:
-            names.append(old_name)
-
-    return names
-
-
 def get_unique_values() -> None:
     data = pd.read_csv(DATA_DIR + 'manga_data_expanded.csv')
     cols = ['authors', 'artists', 'publishers']
@@ -121,7 +110,6 @@ def expand_manga_data(regime: str = 'return') -> Any:
     data = data.drop_duplicates(subset=['url'])
     data['in_lists'] = data['in_lists'].apply(eval)
     data['ratings'] = data['ratings'].apply(eval)
-    data['name'] = set_name(data['name'], data['alt_name'])
 
     data.drop(columns=['alt_name', 'info_list'], inplace=True)
 
