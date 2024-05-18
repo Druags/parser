@@ -209,43 +209,66 @@ def get_object_with_empty_field(session_factory: sessionmaker):
         return result
 
 
-def update_titles(session_factory: sessionmaker,
-                  titles_info: pd.DataFrame):
+def update_title(session_factory: sessionmaker,
+                 title_info: dict):
     with session_factory() as session:
-        for row in tqdm(titles_info.itertuples()):
-            title = session.query(TitleORM).where(TitleORM.url == row.url).one()
+        title = session.query(TitleORM).where(TitleORM.url == title_info.get('url')).one()
 
-            title.release_year = getattr(row, 'release_year')
-            title.chapters_uploaded = getattr(row, 'chapters_uploaded')
+        title.release_year = title_info.get('release_year')
+        title.chapters_uploaded = title_info.get('chapters_uploaded')
 
-            o2m_relations = [
-                (TypeORM, 'type'),
-                (AgeRatingORM, 'age_rating'),
-                (TranslationStatusORM, 'translation_status'),
-                (PublicationStatusORM, 'publication_status')]
-            for relation in o2m_relations:
-                setattr(title,
-                        relation[1],
-                        get_id(session, orm_name=relation[0], key_field_value=getattr(row, relation[1])))
+        o2m_relations = [
+            (TypeORM, 'type'),
+            (AgeRatingORM, 'age_rating'),
+            (TranslationStatusORM, 'translation_status'),
+            (PublicationStatusORM, 'publication_status')]
+        for relation in o2m_relations:
+            setattr(title,
+                    relation[1],
+                    get_id(session, orm_name=relation[0], key_field_value=title_info.get(relation[1])))
 
-            session.add(title)
-            m2m_relations = (
-                TableRelation(AuthorORM, 'authors', getattr(row, 'authors')),
-                TableRelation(PublisherORM, 'publishers', getattr(row, 'publishers')),
-                TableRelation(ArtistORM, 'artists', getattr(row, 'artists')),
-                TableRelation(ReleaseFormatORM, 'release_formats', getattr(row, 'release_formats')),
-                TableRelation(TagORM, 'tags', getattr(row, 'tags'))
-            )
+        session.add(title)
+        m2m_relations = (
+            TableRelation(AuthorORM, 'authors', title_info.get('authors')),
+            TableRelation(PublisherORM, 'publishers', title_info.get('publishers')),
+            TableRelation(ArtistORM, 'artists', title_info.get('artists')),
+            TableRelation(ReleaseFormatORM, 'release_formats', title_info.get('release_formats')),
+            TableRelation(TagORM, 'tags', title_info.get('tags'))
+        )
 
-            for element in m2m_relations:
-                add_m2m(session,
-                        main_object=title,
-                        join_orm_name=element.orm_name,
-                        b_p_field=element.bp_field_name,
-                        join_records=element.join_records)
+        for element in m2m_relations:
+            add_m2m(session,
+                    main_object=title,
+                    join_orm_name=element.orm_name,
+                    b_p_field=element.bp_field_name,
+                    join_records=element.join_records)
 
-            add_o2m(main_object=title,
-                    b_p_field='ratings',
-                    join_data=getattr(row, 'ratings'),
-                    join_orm_name=TitleRatingORM)
+        add_o2m(main_object=title,
+                b_p_field='ratings',
+                join_data=title_info.get('ratings'),
+                join_orm_name=TitleRatingORM)
+        session.commit()
+
+
+def add_full_user(session_factory: sessionmaker,
+                  user_info: pd.DataFrame) -> None:
+    with session_factory() as session:
+
+        user = UserORM(url=getattr(user_info, 'url'),
+                       sex=getattr(user_info, 'sex'))
+        session.add(user)
+        m2m_relations = (
+            TableRelation(TitleORM, 'favorite_titles', getattr(user_info, 'favorite_titles')),
+            TableRelation(TitleORM, 'abandoned_titles', getattr(user_info, 'abandoned_titles'))
+        )
+
+        for element in m2m_relations:
+            add_m2m(session,
+                    main_object=user,
+                    join_orm_name=element.orm_name,
+                    b_p_field=element.bp_field_name,
+                    join_records=element.join_records,
+                    key_field_name=element.key_field_name)
+
+        session.flush()
         session.commit()
