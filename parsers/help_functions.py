@@ -8,6 +8,8 @@ import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as EC
 
+from db.everything.data_work import fix_year
+
 
 def get_user_sex(soup: BeautifulSoup) -> int:
     try:
@@ -21,22 +23,25 @@ def get_user_sex(soup: BeautifulSoup) -> int:
             sex = 1
     except IndexError:
         sex = 2
-        print('Пол не указан')
     except AttributeError:
         sex = 2
-        print('Пол не указан, но есть описание')
     except Exception as e:
         sex = 2
         print('Неизвестная ошибка при поиске пола', e)
     return sex
 
 
-def get_manga_info_list(soup):
-    keys = (soup.find('div', {'class': 'media-info-list'}).
-            find_all('div', {'class': 'media-info-list__title'}))
+def get_title_info_list(soup):
+    try:
+        keys = (soup.find('div', {'class': 'media-info-list'}).
+                find_all('div', {'class': 'media-info-list__title'}))
 
-    values = (soup.find('div', {'class': 'media-info-list'}).
-              find_all('div', {'class': 'media-info-list__value'}))
+        values = (soup.find('div', {'class': 'media-info-list'}).
+                  find_all('div', {'class': 'media-info-list__value'}))
+    except Exception as e:
+        print('Неизвестная ошибка', e)
+        return
+
     try:
         info_list = {key.text: value.text.strip() for key, value in zip(keys, values)}
     except Exception as e:
@@ -46,12 +51,12 @@ def get_manga_info_list(soup):
     return info_list
 
 
-def convert_book_info(tags, info_list, ratings) -> dict:
+def convert_title_info(tags, info_list, ratings) -> dict:
 
     book_info = {'type': info_list['Тип'],
                  'tags': set(tag.lower() for tag in tags),
                  'ratings': ratings,
-                 'release_year': info_list.get('Год релиза'),
+                 'release_year': fix_year(info_list.get('Год релиза')),
                  'publication_status': info_list.get('Статус тайтла'),
                  'translation_status': info_list.get('Статус перевода'),
                  'authors': set(author.lower() for author in info_list.get('Автор', '').split('\n')),
@@ -67,9 +72,12 @@ def convert_book_info(tags, info_list, ratings) -> dict:
 def get_manga_statistics(soup) -> (dict, dict):
     lists = ['Читаю', 'В планах', 'Брошено', 'Прочитано', 'Любимое', 'Другое']
     stars = range(10, 0, -1)
-
-    statistics_div = (soup.find('div', {'class': 'media-section_stats'}).
-                      find_all('div', {'class': 'media-section__col'}))
+    try:
+        statistics_div = (soup.find('div', {'class': 'media-section_stats'}).
+                          find_all('div', {'class': 'media-section__col'}))
+    except AttributeError as e:
+        print(e)
+        return
 
     try:
         in_lists = {key: int(value.text) for key, value in
@@ -127,7 +135,8 @@ def start_driver(undetected=True):
             options=chrome_options,
             seleniumwire_options=proxy_options,
             driver_executable_path=ChromeDriverManager().install(),
-            use_subprocess=False
+            use_subprocess=False,
+            no_sandbox=False
         )
     else:
         chrome_options = webdriver.ChromeOptions()
