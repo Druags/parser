@@ -8,3 +8,11 @@
 Проект для сбора данных с одного конкретного сайта с мангой.
 
 Данные собираются посредством библиотеки selenium, записываются в базу данных MySQL для дальнейшей обработки и создания дашбордов в Superset
+
+Построенные дашборды:
+<details>
+  <summary>Изображения</summary>
+
+  <img a="https://github.com/Druags/parser/blob/master/screenshots/first_page.jpg">
+  <img a="https://github.com/Druags/parser/blob/master/screenshots/second_page.jpg">
+</details>
