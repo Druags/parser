@@ -12,7 +12,7 @@
 Построенные дашборды:
 <details>
   <summary>Изображения</summary>
-
-  <img a="https://github.com/Druags/parser/blob/master/screenshots/first_page.jpg">
-  <img a="https://github.com/Druags/parser/blob/master/screenshots/second_page.jpg">
+  
+   ![Первая страница](https://github.com/Druags/parser/blob/master/screenshots/first_page.jpg)
+  ![Вторая страницаt](https://github.com/Druags/parser/blob/master/screenshots/second_page.jpg)
 </details>
