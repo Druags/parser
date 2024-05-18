@@ -6,9 +6,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from creds import mail, password
 from parsers.data_classes import UserInfo, UserIsInactiveException, PageNotFound
-from parsers.help_functions import get_user_sex, get_user_favorite_tags, user_is_active, get_manga_info_list, \
-    get_manga_statistics, convert_book_info, scroll_down
-from selenium.common.exceptions import NoSuchElementException
+from parsers.help_functions import get_user_sex, get_user_favorite_tags, user_is_active, get_title_info_list, \
+    get_manga_statistics, convert_title_info, scroll_down
+from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException
 
 
 def authorize(driver):
@@ -26,7 +26,7 @@ def authorize(driver):
 def parse_user_info(driver, user_url: str):
     driver.get(user_url + '?folder=5')
     if '404' in driver.title:
-        raise PageNotFound('Страница пользователя недоступна или заблокирована')
+        return
 
     WebDriverWait(driver, 20).until_not(
         EC.presence_of_element_located((By.CLASS_NAME, 'loader-wrapper'))
@@ -34,32 +34,38 @@ def parse_user_info(driver, user_url: str):
 
     soup = BeautifulSoup(driver.page_source, features="html.parser")
     if not user_is_active(soup):
-        raise UserIsInactiveException('Пользователь не соответствует поставленным требованиям')
+        return
 
     favorite_tags = get_user_favorite_tags(soup)
     sex = get_user_sex(soup)
     favorites_links = parse_user_mangas(driver, user_url + '?folder=5')
     abandoned_links = parse_user_mangas(driver, user_url + '?folder=3')
+    url = int(user_url.split('/')[-1])
 
-    return UserInfo(sex, favorite_tags, favorites_links, abandoned_links)
+    return UserInfo(url, sex, favorite_tags, favorites_links, abandoned_links)
 
 
-def parse_book(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
-               link: str):
-    driver.get(link)
+def parse_title(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
+                url: str):
+    driver.get(url)
 
     if '404' in driver.title:
-        raise PageNotFound('Страница не найдена')
+        print(url, 'Страница не найдена')
+        return
 
     if not driver.find_element(By.CLASS_NAME, 'modal__header'):
-        print('Не найден modal')
+        print(url, 'modal не найден')
         return
 
     try:
         more_button = driver.find_element(By.CLASS_NAME, 'media-tag-item_more')
         more_button.click()
-    except NoSuchElementException as e:
-        print('Кнопка расширения списка тегов не найдена')
+    except NoSuchElementException:
+        pass
+    except ElementNotInteractableException:
+        pass
+    except Exception as e:
+        print(url, 'Неизвестная ошибка', e)
 
     soup = BeautifulSoup(driver.page_source, features="html.parser")
 
@@ -67,15 +73,19 @@ def parse_book(driver: selenium.webdriver.chromium.webdriver.ChromiumDriver,
     if tags:
         tags = [tag.text for tag in tags.find_all('a', {'class': 'media-tag-item'})]
 
-    info_list = get_manga_info_list(soup)
+    info_list = get_title_info_list(soup)
+    if not info_list:
+        print(url, 'нет информации')
+        return
+
     in_lists, ratings = get_manga_statistics(soup)
-    book_info = convert_book_info(tags, info_list, ratings)
-    return book_info
+    title_info = convert_title_info(tags, info_list, ratings)
+    return title_info
 
 
 # TODO парсит дубликаты
 def parse_user_mangas(driver, user_url: str) -> set:
-    links = set()
+    title_urls = set()
     try:
         driver.get(user_url)
         scroll_down(driver)
@@ -84,9 +94,9 @@ def parse_user_mangas(driver, user_url: str) -> set:
                      .find_all('div', {'class': 'bookmark-item'}))
         for bookmark in bookmarks:
             raw_link = bookmark.find('div', {'class': 'bookmark-item__info-header'}).find('a').get('href')
-            clean_link = 'https://mangalib.me' + raw_link.split('?')[0]
-            if clean_link not in links:
-                links.add(clean_link)
+            title_url = raw_link.split('?')[0][1:]
+            if title_url not in title_urls:
+                title_urls.add(title_url)
     except Exception as e:
         if '?folder=5' in user_url:
             print('Неизвестная ошибка при поиске любимых тайтлов')
@@ -94,4 +104,4 @@ def parse_user_mangas(driver, user_url: str) -> set:
             print('Неизвестная ошибка при поиске брошеных тайтлов')
         print(e)
 
-    return links
+    return title_urls
