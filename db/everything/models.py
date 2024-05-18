@@ -22,7 +22,7 @@ class UserORM(Base):
     __tablename__ = 'user'
 
     id: Mapped[int_pk]
-    url: Mapped[int] = mapped_column(Integer)
+    url: Mapped[int] = mapped_column(Integer, unique=True)
     sex: Mapped[int] = mapped_column(SmallInteger)
 
     favorite_titles: Mapped[list['TitleORM']] = relationship(
