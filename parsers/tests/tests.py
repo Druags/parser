@@ -15,7 +15,7 @@ from parsers.code import start_driver, get_users_info, get_books_info
 import pandas as pd
 
 import data
-from parsers.parsers_funcs import parse_user_info, parse_book
+from parsers.parsers_funcs import parse_user_info, parse_title
 
 
 class TestQueries(unittest.TestCase):
@@ -106,7 +106,7 @@ class TestQueries(unittest.TestCase):
 
     def test_positive_parse_book(self):
         book_url = 'ushiro-no-shoumen-kamui-san'
-        result = parse_book(self.driver,
+        result = parse_title(self.driver,
                             'https://mangalib.me/' + book_url)
         self.assertCountEqual(result, data.book_example)
 
@@ -135,3 +135,26 @@ class TestQueries(unittest.TestCase):
 
         self.assertEqual('<TitleORM id=1, url=ushiro-no-shoumen-kamui-san, release_year=2020>',
                          str(result))
+
+    def test_negative_parse_book(self):
+        url = 'https://mangalib.me/63067'
+        parse_title(self.driver, url)
+        self.assertRaises(AttributeError)
+
+    def test_positive_parse_book_new(self):
+        url = 'https://mangalib.me/i-played-the-role-of-a-hated-hero-but-for-some-reason-im-loved-by-the-last-boss-and-living-with-her'
+        result = parse_title(self.driver, url)
+        expected = {'type': 'Манга', 'tags': {'боевик', 'гарем', 'комедия', 'магия', 'фэнтези', 'гг мужчина', 'этти',
+                                              'волшебники / маги', 'приключения'},
+                    'ratings': {10: 141, 9: 10, 8: 38, 7: 18, 6: 24, 5: 10, 4: 6, 3: 5, 2: 4, 1: 32},
+                    'release_year': '2021', 'publication_status': 'Завершён', 'translation_status': 'Завершен',
+                    'authors': {'sadakiyo kazuhiko'}, 'artists': {'sadakiyo kazuhiko'}, 'publishers': {'takeshobo'},
+                    'chapters_uploaded': '22', 'age_rating': '18+', 'release_formats': {'веб'}}
+
+        self.assertEqual(expected, result)
+
+    def test_parse_book_cant_click_button(self):
+        url = 'https://mangalib.me/salvos-webtoon'
+        result = parse_title(self.driver, url)
+
+
