@@ -1,13 +1,18 @@
-import pandas as pd
+import logging
+
+import MySQLdb
+from sqlalchemy.exc import OperationalError
 
 from sqlalchemy.orm import sessionmaker
 from selenium.webdriver.chromium.webdriver import ChromiumDriver
-from db.everything.queries import get_max_user_url, add_full_users, get_object_with_empty_field, \
-    update_titles
+from tqdm import tqdm
+
+from db.everything.queries import get_max_user_url, get_object_with_empty_field, \
+    update_title, add_full_user
 from parsers.data_classes import UserIsInactiveException
 
 from parsers.help_functions import start_driver
-from parsers.parsers_funcs import parse_user_info, parse_book
+from parsers.parsers_funcs import parse_user_info, parse_title
 
 
 def get_users_info(driver: ChromiumDriver,
@@ -18,23 +23,16 @@ def get_users_info(driver: ChromiumDriver,
         last_used_url = get_max_user_url(session_factory)
         user_ids = range(last_used_url + 1, last_used_url + amount + 1)
 
-    user_info = pd.DataFrame(columns=['url', 'sex', 'favorite_tags', 'favorite_titles', 'abandoned_titles'])
-    for i, user_id in enumerate(user_ids):
-        if i % 70 == 0:
-            driver.quit()
-            driver = start_driver()
+    for i, user_id in tqdm(enumerate(user_ids)):
         try:
             full_url = 'https://mangalib.me/user/' + str(user_id)
             user_data = parse_user_info(driver, full_url)
             if user_data:
-                user_info.loc[i] = [user_id, *user_data]
+                add_full_user(session_factory, user_data)
         except UserIsInactiveException as e:
             pass
         except Exception as e:
-            print('Неизвестная ошибка. https://mangalib.me/user/' + str(user_id), e)
-
-    add_full_users(session_factory, user_info)
-    driver.close()
+            logging.error('Неизвестная ошибка. https://mangalib.me/user/' + str(user_id), e)
 
 
 def get_books_info(driver: ChromiumDriver,
@@ -43,12 +41,14 @@ def get_books_info(driver: ChromiumDriver,
     if use_db:
         title_urls = get_object_with_empty_field(session_factory)
     else:
-        title_urls = ['ushiro-no-shoumen-kamui-san']
-    titles = pd.DataFrame(columns=['url', 'type', 'tags', 'ratings', 'release_year', 'publication_status',
-                                   'translation_status', 'authors', 'artists', 'publishers',
-                                   'chapters_uploaded', 'age_rating', 'release_formats'])
-    for url in title_urls:
-        title_info = parse_book(driver, 'https://mangalib.me/' + url)
-        titles.loc[len(titles.index)] = [url, *title_info.values()]
+        return
 
-    update_titles(session_factory, titles)
+    for url in tqdm(title_urls):
+        title_info = parse_title(driver, 'https://mangalib.me/' + url)
+        if title_info:
+            title_info['url'] = url
+            update_title(session_factory, title_info)
+        else:
+            print(url, 'не удалось использовать')
+
+
