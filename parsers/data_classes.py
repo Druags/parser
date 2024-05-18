@@ -3,10 +3,11 @@ from dataclasses import dataclass, fields
 
 @dataclass
 class UserInfo:
+    url: int
     sex: int
     f_tags: dict
-    f_titles: set
-    a_titles: set
+    favorite_titles: set
+    abandoned_titles: set
 
     def __iter__(self):
         for field in fields(self):
