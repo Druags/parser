@@ -1,32 +1,45 @@
 import os
 import signal
 import time
+import logging
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+
 from sqlalchemy.orm import sessionmaker
 
-from config import settings
-from parsers.code import start_driver, get_users_info
+from config import settings, ROOT_PATH
+from parsers.code import start_driver, get_users_info, get_books_info
 
 
 def main():
-    if not (os.path.exists('data') and os.path.isdir('data')):
-        os.mkdir('data')
-    driver = start_driver()
+    logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+
+    if not (os.path.exists(ROOT_PATH+'data') and os.path.isdir(ROOT_PATH+'data')):
+        os.mkdir(ROOT_PATH+'/data')
     mysql_engine = create_engine(
         url=settings.DATABASE_URL_mysql
     )
-    session_factory = sessionmaker(mysql_engine)
-    get_users_info(driver, session_factory, amount=100)
+
+    try:
+        session_factory = sessionmaker(mysql_engine)
+        with session_factory() as session:
+            session.execute(text('SELECT 1'))
+    except Exception as e:
+        raise e
+
+    driver = start_driver()
+    get_users_info(driver, session_factory, amount=100000)
+    # get_books_info(driver, session_factory, use_db=True)
 
     pid = driver.service.process.pid
-    driver.close()
 
     try:
         os.kill(int(pid), signal.SIGTERM)
-        print("Killed chrome using process")
     except ProcessLookupError as e:
         print('Не удалось убить процесс', e)
+    except PermissionError as e:
+        print('PermissionError: [WinError 5] Отказано в доступе')
+    driver.quit()
 
 
 if __name__ == '__main__':
